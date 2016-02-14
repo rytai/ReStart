@@ -1,0 +1,2 @@
+15.12.2015 I started an changelog!
+12.17.2015 Muokattu pathdinder A* algoritmin mukaiseksi, käyttäen priority dict -luokkaa.

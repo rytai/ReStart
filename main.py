@@ -46,11 +46,11 @@ def start_menu(default_font, screen):
         '| F1 - Enable GodMode',
         '|----------------------------------------'
     ]
+    line_space = basic_font.size(text_lines[0])[1] + 2
 
     # render the text_lines in_place
     text_lines = [basic_font.render(x, False, colorWhite, colorBlack) for x in text_lines]
 
-    line_space = basic_font.size(text_lines[0])[1] + 2
 
     for i in range(0, text_lines.__len__()):
         screen.blit(text_lines[i], (10, (10 + line_space) * i + 10))
@@ -68,7 +68,7 @@ def start_menu(default_font, screen):
                     stuck_in_beginning = False
 
 
-# StartMenu(defaultFont, screen_)
+start_menu(defaultFont, screen_)
 
 # Classes----------------------------
 

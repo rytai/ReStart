@@ -128,7 +128,7 @@ class MapLoader:
 
         map_size = f.readline()
 
-        map_size = int(map_size[:2]), int(map_size[-3:-1])
+        map_size = int(map_size[:2]), int(map_size[3:5])
 
         map_name = f.readline()
 

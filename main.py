@@ -26,31 +26,32 @@ screen_ = pygame.display.set_mode(size)
 # STARTGAME--------------------------
 
 screen_.fill(colorBlack)
-
-defaultFont = pygame.font.get_default_font()
+#default_font = 'basis33.ttf'
+default_font = pygame.font.get_default_font()
 
 
 def start_menu(default_font, screen):
-    basic_font = pygame.font.Font(default_font, 15)
+    basic_font = default_font
+    basic_font = pygame.font.Font('basis33.ttf', 40)
 
     text_lines = [
         'Welcome to the survival games.     (Currently you have godmode enabled.)',
         'Press Space to begin.',
         '',
         '|----------------------------------------',
-        '|Move with numpad or arrows.',
-        '| , - Pick Item',
-        '| I - Open Inventory',
-        '| + - Add an enemy',
-        '| > - Change map',
-        '| F1 - Enable GodMode',
+        '| Move with numpad or arrows.',
+        '|  ,  - Pick Item',
+        '|  I  - Open Inventory',
+        '|  +  - Add an enemy',
+        '|  >  - Change map',
+        '|  F1 - Enable GodMode',
         '|----------------------------------------'
     ]
+    line_space = basic_font.size(text_lines[0])[1] + 2
 
     # render the text_lines in_place
     text_lines = [basic_font.render(x, False, colorWhite, colorBlack) for x in text_lines]
 
-    line_space = basic_font.size(text_lines[0])[1] + 2
 
     for i in range(0, text_lines.__len__()):
         screen.blit(text_lines[i], (10, (10 + line_space) * i + 10))
@@ -68,7 +69,7 @@ def start_menu(default_font, screen):
                     stuck_in_beginning = False
 
 
-# StartMenu(defaultFont, screen_)
+start_menu(default_font, screen_)
 
 # Classes----------------------------
 
@@ -516,7 +517,7 @@ def main(screen):
     camera = Camera(starting_position=hero.positionOnMap, viewport_size=(10, 10))
     camera.set_viewport_boundaries((0, 0), map_data.mapBoundaries)
 
-    message_log = MessageLog(defaultFont)
+    message_log = MessageLog(default_font)
     message_log.position = (screen.get_size()[0] - message_log.render.get_size()[0], 0)
 
     # Temporary. Combat is on at the start

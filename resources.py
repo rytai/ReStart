@@ -1,3 +1,4 @@
+# coding=utf-8
 import pygame
 import os
 
@@ -22,6 +23,9 @@ class Resource_Loader():
 
     loaded_sprites = {}
     map_tiles_loaded = False
+
+    frames = {1: 'frame_default'}
+    frame_folder = os.path.join('Resources', 'Frames')
 
     def __init__(self):
         self.map_tiles_loaded = False
@@ -70,3 +74,28 @@ class Resource_Loader():
                 self.map_tiles_loaded = True
 
         return self.map_tiles
+
+    def get_frame_pieces(self, frame_id_int):
+        """Frame koostuu kahdeksasta osasta.
+        Palautetaan lista alkaen vasemmasta yläreunasta myötäpäivään"""
+        #Framea ei ole ladattu
+        try:
+            frame_pieces = []
+            frame_pieces.append(os.path.join(self.frame_folder, self.frames[frame_id_int]+'_topleft.png'))
+            frame_pieces.append(os.path.join(self.frame_folder, self.frames[frame_id_int]+'_top.png'))
+            frame_pieces.append(os.path.join(self.frame_folder, self.frames[frame_id_int]+'_topright.png'))
+            frame_pieces.append(os.path.join(self.frame_folder, self.frames[frame_id_int]+'_right.png'))
+            frame_pieces.append(os.path.join(self.frame_folder, self.frames[frame_id_int]+'_botright.png'))
+            frame_pieces.append(os.path.join(self.frame_folder, self.frames[frame_id_int]+'_bot.png'))
+            frame_pieces.append(os.path.join(self.frame_folder, self.frames[frame_id_int]+'_botleft.png'))
+            frame_pieces.append(os.path.join(self.frame_folder, self.frames[frame_id_int]+'_left.png'))
+            self.frames[frame_id_int] = frame_pieces
+            self.load_frame_pieces(frame_id_int)
+
+        except TypeError, error: #  Frame on ladattu
+            print error
+
+        return self.frames[frame_id_int]
+
+    def load_frame_pieces(self, frame_id):
+        self.frames[frame_id] = [pygame.image.load(file_path) for file_path in self.frames[frame_id]]

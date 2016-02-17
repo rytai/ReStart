@@ -15,6 +15,9 @@ class Window:
 
     dialog_instance = None
 
+    frame_id = None
+    frame_surface = None
+
     def __init__(self, rect=None):
         """
 
@@ -40,16 +43,37 @@ class Window:
         return self.background_color, self.background_image
 
 
+    @property
+    def get_frame_id(self):
+        return self.frame_id
+
+    def set_frame_id(self, id_):
+        self.frame_id = id_
+
+    @property
+    def get_frame_surface(self):
+        return self.frame_surface
+
+    def set_frame_surface(self, surface):
+        self.frame_surface = surface
+
+
 class DialogWindow(Window):
     portrait_surface = None
     text_lines = ['', '', '', '']
     title = 'Default title.'
 
     def __init__(self):
+        """
+
+        :rtype: DialogWindow
+        """
         Window.__init__(self)
         Window.dialog_instance = self
 
         self.rect = Rect(20, 670, 635, 820-670)
+        self.frame_id = 1
+        self.frame_surface = None
 
     @property
     def get_text_lines(self):

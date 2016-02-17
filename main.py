@@ -1,3 +1,4 @@
+# coding=utf-8
 import os
 import sys
 import pygame
@@ -485,6 +486,15 @@ def push_new_user_event(user_event_type=None, data=None):
     pygame.event.post(new_event)
 
 
+def set_window_frames(dialog_window_inst, resource_loader, drawing, id=None):
+    # Tarkistetaan, että framet pitää oikeasti vaihtaa.
+    if dialog_window_inst.get_frame_surface is None and dialog_window_inst.frame_id != id:
+        frame_id = dialog_window_inst.get_frame_id
+        frame_bits = resource_loader.get_frame_pieces(frame_id)
+        frame_render = drawing.render_frames(frame_bits, size=dialog_window_inst.rect.size)
+        dialog_window_inst.set_frame_surface(frame_render)
+
+
 def main(screen):
     # -----------Debug------------
     enable_pathfinder_screen = False  # Draws the found pathfinder path
@@ -527,6 +537,7 @@ def main(screen):
     dialogs = Dialogs()
 
     dialog_window_inst = windows.DialogWindow()
+    set_window_frames(dialog_window_inst, resource_loader, drawing)
 
     # Temporary. Combat is on at the start
     in_combat = False

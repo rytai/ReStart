@@ -38,3 +38,7 @@
     23.1
       MapEditor:Piirtää tiilet oikeaan reunaan messagelogin tilalle.
                 Esc ja Tab palauttaa takaisin peliin.
+    17.2
+	Ikkunoiden piirto.
+	Dialogi-ikkunat.
+	Kansiorakenteen muutos. Resurssit resurssit-kansioon. Alkuperäiset originals-kansioon

@@ -1,9 +1,10 @@
 import pygame
+import os
 
 __author__ = 'Kodex'
 
-class Resource_Loader():
 
+class Resource_Loader():
     # 64x64 character/item sprite
     sprites = {
         'hero': 'dg_classm32_swordHero.gif',
@@ -11,18 +12,19 @@ class Resource_Loader():
 
         'sword': 'dg_weapons32_sword.gif'
     }
+    sprites_folder = os.path.join('Resources', 'Sprites')
 
     map_tiles = {
         1: ('dg_features32_floor.gif', True),
         2: ('dg_extra132_boulderFloor.gif', False),
     }
+    map_tiles_folder = os.path.join('Resources', 'Sprites')
 
     loaded_sprites = {}
     map_tiles_loaded = False
 
     def __init__(self):
         self.map_tiles_loaded = False
-
 
     def load_sprite(self, key):
         """
@@ -37,7 +39,8 @@ class Resource_Loader():
             if self.sprites[key] == 'Sprite_loaded':
                 return self.loaded_sprites[key]
             else:
-                new_sprite = pygame.image.load(self.sprites[key])
+                sprite_file_path = os.path.join(self.sprites_folder, self.sprites[key])
+                new_sprite = pygame.image.load(sprite_file_path)
         except KeyError:
             print 'ResourceLoader Error: No sprite keyed: {}'.format(key)
             return None
@@ -59,6 +62,7 @@ class Resource_Loader():
         if self.map_tiles_loaded == False:
             for id, file_path_passable in self.map_tiles.items():
                 file_path, passable = file_path_passable
+                file_path = os.path.join(self.map_tiles_folder, file_path)
                 new_surface = pygame.image.load(file_path)
                 new_surface = pygame.transform.scale(new_surface, (64, 64))
                 self.map_tiles[id] = new_surface, passable

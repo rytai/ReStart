@@ -1,3 +1,5 @@
+import os
+
 import resources
 from creatures import NPC
 __author__ = 'Kodex'
@@ -9,6 +11,8 @@ class MapLoader:
     _Intent = None
     map_data_list = []
     current_map = None
+
+    map_data_folder = os.path.join('Resources', 'Levels')
 
     def __init__(self, _MapData, _NPC, _Intent):
         """
@@ -122,9 +126,9 @@ class MapLoader:
         _string_position += _amount
         return _data_bit, _string_position
 
-    @staticmethod
-    def load_map_data(_map_name):
-        f = open(_map_name, 'r')
+    def load_map_data(self, _map_name):
+        map_file_name = os.path.join(self.map_data_folder, _map_name)
+        f = open(map_file_name, 'r')
 
         map_size = f.readline()
 

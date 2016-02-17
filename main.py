@@ -1,3 +1,4 @@
+import os
 import sys
 import pygame
 from collections import deque  # Queues
@@ -34,7 +35,8 @@ default_font = pygame.font.get_default_font()
 
 def start_menu(default_font, screen):
     basic_font = default_font
-    basic_font = pygame.font.Font('basis33.ttf', 40)
+    file_path = os.path.join('Resources', 'Fonts', 'basis33.ttf')
+    basic_font = pygame.font.Font(file_path, 40)
 
     text_lines = [
         'Welcome to the survival games.     (Currently you have godmode enabled.)',
@@ -679,7 +681,7 @@ def main(screen):
                     message_log.set_is_dirty(True)
                 # F4: Open chat-window
                 elif event.key == pygame.K_F4:
-                    push_new_user_event('open-dialog', data=2)
+                    push_new_user_event('open-dialog', data=1)
                 # Home: Mouse position to caption.
                 elif event.key == pygame.K_HOME:
                     devtools.mouse_position_to_caption()

@@ -3,13 +3,15 @@ import pygame
 from collections import deque  # Queues
 import random
 from PathFinder import PathFinder
-from drawing import DirtyDrawing
+from dialogs import *
+import drawing
 from map_stuff import MapData, MapLoader
 from creatures import Creature, Hero, NPC
 from item_stuff import *
 import dice as dice
 import resources
-from devtools import Map_editor
+import devtools
+import windows
 
 __author__ = 'Kodex'
 
@@ -26,7 +28,7 @@ screen_ = pygame.display.set_mode(size)
 # STARTGAME--------------------------
 
 screen_.fill(colorBlack)
-#default_font = 'basis33.ttf'
+# default_font = 'basis33.ttf'
 default_font = pygame.font.get_default_font()
 
 
@@ -52,7 +54,6 @@ def start_menu(default_font, screen):
     # render the text_lines in_place
     text_lines = [basic_font.render(x, False, colorWhite, colorBlack) for x in text_lines]
 
-
     for i in range(0, text_lines.__len__()):
         screen.blit(text_lines[i], (10, (10 + line_space) * i + 10))
 
@@ -70,6 +71,7 @@ def start_menu(default_font, screen):
 
 
 start_menu(default_font, screen_)
+
 
 # Classes----------------------------
 
@@ -451,7 +453,7 @@ def load_map(map_name=None, map_loader=None, resource_loader=None, hero=None):
     map_surface_size = map_data.mapBoundaries[0] * 64, map_data.mapBoundaries[1] * 64
     floor_s = pygame.Surface(map_surface_size)
     world_s = pygame.Surface(map_surface_size)
-    dirty_drawing = DirtyDrawing(floor_s, map_data.get_texture_layer)
+    dirty_drawing = drawing.DirtyDrawing(floor_s, map_data.get_texture_layer)
 
     if not map_data.tile_occupied(hero_position):
         map_data.set_character_on_map(hero, hero_position)
@@ -504,7 +506,7 @@ def main(screen):
     main_menu = MainMenu()
 
     map_loader = MapLoader(MapData, NPC, Intent)
-    map_editor = Map_editor(resource_loader)
+    map_editor = devtools.Map_editor(resource_loader)
 
     hero = Hero(surface=resource_loader.load_sprite('hero'), intent_instance=Intent(), inventory_instance=Inventory())
 
@@ -520,6 +522,10 @@ def main(screen):
     message_log = MessageLog(default_font)
     message_log.position = (screen.get_size()[0] - message_log.render.get_size()[0], 0)
 
+    dialogs = Dialogs()
+
+    dialog_window_inst = windows.DialogWindow()
+
     # Temporary. Combat is on at the start
     in_combat = False
 
@@ -531,6 +537,8 @@ def main(screen):
     map_data.set_item_on_map(new_sword, (3, 4))
 
     temp_sound = pygame.mixer.Sound('map_change.wav')
+
+    default_font_inited = pygame.font.Font(default_font, 17)
 
     # MAINLOOP--------------------------
     while 1:
@@ -605,6 +613,12 @@ def main(screen):
                 elif event.subtype is 'menu':
                     main_menu.launch(screen)
 
+                elif event.subtype is 'open-dialog':
+                    dialog_id = event.data
+                    dialog_window_inst.set_text_lines(dialogs.get_dialog(dialog_id))
+                    dialog_window_inst.set_title('Hello world.')
+                    drawing.render_window(screen, dialog_window_inst, default_font_inited)
+
             if event.type == pygame.KEYUP:
                 if print_keypresses:
                     print event.key
@@ -663,6 +677,12 @@ def main(screen):
                     screen.fill(colorBlack)
                     dirty_drawing.issue_world_surface_redraw()
                     message_log.set_is_dirty(True)
+                # F4: Open chat-window
+                elif event.key == pygame.K_F4:
+                    push_new_user_event('open-dialog', data=2)
+                # Home: Mouse position to caption.
+                elif event.key == pygame.K_HOME:
+                    devtools.mouse_position_to_caption()
                 # TAB : Terminate program
                 elif event.key == pygame.K_TAB:
                     sys.exit()

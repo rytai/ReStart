@@ -5,7 +5,6 @@ import sys
 
 
 class Map_editor:
-
     def __init__(self, resource_loader_inst):
         assert isinstance(resource_loader_inst, resources.Resource_Loader)
 
@@ -44,10 +43,10 @@ class Map_editor:
         # Calculate map size
         assert isinstance(map_data, map_stuff.MapData)
         map_size = map_data.get_map_size
-        map_screen_size = world_window_size # tile_value_to_screen_value(map_size)
+        map_screen_size = world_window_size  # tile_value_to_screen_value(map_size)
 
         # Load surfaces
-        world_window_surface = pygame.Surface((64*13, 64*13))
+        world_window_surface = pygame.Surface((64 * 13, 64 * 13))
         floor_surface = pygame.Surface(map_size)
         inventory_surface = pygame.Surface(map_size)
         char_surface = pygame.Surface(map_size)
@@ -55,11 +54,11 @@ class Map_editor:
         surfaces = [world_window_surface, floor_surface, inventory_surface, char_surface]
 
         tilesheet_surface = pygame.Surface((385, 840))
-        tilesheet_rect = tilesheet_surface.get_rect(topleft=(895,0))
+        tilesheet_rect = tilesheet_surface.get_rect(topleft=(895, 0))
 
         tilesheet_surface = self.draw_tilesheet_window(tilesheet_surface)
 
-        tilecursor_pos = (1,1)
+        tilecursor_pos = (1, 1)
 
         # Clear all the events.
         pygame.event.clear()
@@ -71,7 +70,7 @@ class Map_editor:
                     sys.exit()
                 if event.type == pygame.KEYUP:
                     if event.key == pygame.K_SPACE:
-                        pass # Place tile
+                        pass  # Place tile
                     elif event.key == pygame.K_UP or event.key == pygame.K_KP8:
                         pass
                     elif event.key == pygame.K_DOWN or event.key == pygame.K_KP2:
@@ -86,3 +85,8 @@ class Map_editor:
             screen.blit(tilesheet_surface, tilesheet_rect)
 
             pygame.display.flip()
+
+
+def mouse_position_to_caption():
+    mouse_position = str(pygame.mouse.get_pos())
+    pygame.display.set_caption(mouse_position)

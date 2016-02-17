@@ -1,9 +1,67 @@
+# coding=utf-8
 from map_stuff import MapData
 from pygame import Surface
 from pygame import Rect
+from windows import *
 import pygame
 
 __author__ = 'Kodex'
+
+# -Settings
+
+# --Dialog window
+dialog_line_space_ = 25
+
+
+def render_text_on_surface(surface, font=None, text='def', color=(255, 255, 255), bg_color=(0, 0, 0), position=(0, 0)):
+    if font is None:
+        return surface
+    new_render = font.render(text, False, color, bg_color)
+
+    surface.blit(new_render, position)
+
+    return surface
+
+
+def render_window(dest_surface, window_inst, default_font):
+    """
+
+    :param dest_surface: pygame.Surface
+    :type window_inst: Window or DialogWindow
+    :rtype: surface
+    """
+    # Luodaan rect ja surface ikkunalle.
+    surface_rect = window_inst.rect
+    surface = pygame.Surface(surface_rect.size)
+
+    bg_color, bg_image = window_inst.get_background
+
+    surface.fill(bg_color)
+    if bg_image:
+        surface.blit(bg_image, (0, 0))
+
+    # -- Dialog --
+    try:
+        text_lines = window_inst.get_text_lines
+        title = window_inst.get_title
+
+        color = (0, 0, 0)
+        bg_color = (255, 255, 255)
+
+        text_pos = (20, 40)
+        for line in text_lines:
+            text_pos = text_pos[0], text_pos[1] + dialog_line_space_
+            render_text_on_surface(surface, default_font, line, position=text_pos, color=color, bg_color=bg_color)
+
+        text_pos = (10, 15)
+        render_text_on_surface(surface, default_font, title, position=text_pos, color=color, bg_color=bg_color)
+
+    except NameError, error:
+        print error
+
+    dest_surface.blit(surface, surface_rect)
+
+    return dest_surface
 
 
 class DirtyDrawing:
@@ -147,17 +205,3 @@ def world_rect_of_tile_rect(tile_rectangle):
     height = tile_rectangle.height * 64
     world_rect = Rect(topleft, (width, height))
     return world_rect
-
-
-class TextBlit:
-    def __init__(self, text_blit_area):
-        self.surface = pygame.Surface(text_blit_area)
-        self.default_font = pygame.font.get_default_font()
-        assert isinstance(self.default_font, pygame.font.Font)
-
-    def render_text(self, font=None, text='def', color=(255,255,255), bg_color=(0,0,0), position=(0,0)):
-        if font is None:
-            font = self.default_font
-        new_render = font.render(text, False, color, bg_color)
-
-        self.surface.blit(new_render, position)

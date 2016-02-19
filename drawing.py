@@ -68,11 +68,11 @@ def render_window(dest_surface, window_inst, default_font):
     return dest_surface
 
 
-def render_frames(frame_bits, surface=None, size=None):
+def render_frames(frame, surface=None, size=None):
     """
     Dynamically render frames inside surface.
     :type surface: pygame.Surface
-    :type frame_bits: list
+    :type frame: list or pygame.Surface
     :type size (int)
     """
     dest_surface = surface
@@ -82,24 +82,29 @@ def render_frames(frame_bits, surface=None, size=None):
         dest_surface = pygame.Surface(size)
 
     surface_size = dest_surface.get_size()
-    frame_size = frame_bits[0].get_size()
-    # Coordinates:
-    top = 0
-    bot = surface_size[1]-frame_size[1]
-    left = 0
-    right = surface_size[0]-frame_size[0]
-    # Sides
-    for x in range(0, surface_size[0]-1):
-        dest_surface.blit(frame_bits[1], (x, top))
-        dest_surface.blit(frame_bits[5], (x, bot))
-    for y in range(0, surface_size[1]-1):
-        dest_surface.blit(frame_bits[3], (left, y))
-        dest_surface.blit(frame_bits[7], (right, y))
-    # Corners
-    dest_surface.blit(frame_bits[0], (left, top))
-    dest_surface.blit(frame_bits[2], (right, top))
-    dest_surface.blit(frame_bits[4], (right, bot))
-    dest_surface.blit(frame_bits[6], (left, bot))
+    try:
+        frame_size = frame[0].get_size()
+        # Coordinates:
+        top = 0
+        bot = surface_size[1] - frame_size[1]
+        left = 0
+        right = surface_size[0] - frame_size[0]
+        # Sides
+        for x in range(0, surface_size[0] - 1):
+            dest_surface.blit(frame[1], (x, top))
+            dest_surface.blit(frame[5], (x, bot))
+        for y in range(0, surface_size[1] - 1):
+            dest_surface.blit(frame[3], (left, y))
+            dest_surface.blit(frame[7], (right, y))
+        # Corners
+        dest_surface.blit(frame[0], (left, top))
+        dest_surface.blit(frame[2], (right, top))
+        dest_surface.blit(frame[4], (right, bot))
+        dest_surface.blit(frame[6], (left, bot))
+    except TypeError, err:
+        if surface_size != frame.get_size():
+            frame = pygame.transform.scale(frame, surface_size)
+        dest_surface.blit(frame, (0, 0))
 
     return dest_surface
 

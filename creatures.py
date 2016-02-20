@@ -13,6 +13,8 @@ class Creature:
 
     inventory = None
 
+    in_combat = True
+
     def __init__(self, surface=None, inventory_instance=None):
         self.name = ""
         self.surface = surface

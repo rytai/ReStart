@@ -284,6 +284,85 @@ class Camera:
         return self.current_viewport
 
 
+class CombatHandler(object):
+    creatures_in_combat = None
+    combat_active = False
+    reaction_order = None
+    creature_in_turn = None
+
+    def __init__(self):
+        self.reaction_order = []
+        self.creature_in_turn = None
+        self.combat_active = None
+        self.creatures_in_combat = None
+
+    def create_combat(self, map_entities):
+        self.reaction_order = []  # Reset reaction. Dice will be thrown in Event
+        self.creature_in_turn = None
+
+        self.creatures_in_combat = [entity for entity in map_entities if entity.in_combat]
+
+        if len(self.creatures_in_combat) != 0:
+            push_new_user_event('combat', 'start')
+
+    def remove_from_combat(self, entity_or_list):
+        self.check_combat_state()
+
+    def add_to_combat(self, entity_or_list):
+        try:
+            for entity in entity_or_list:
+                self.creatures_in_combat.append(entity)
+        except TypeError, err:
+            self.creatures_in_combat.append(entity_or_list)
+        pass
+
+    def check_combat_state(self):
+        if self.creatures_in_combat.__len__() == 0:
+            pass  # STOP COMBAT
+
+    def next_creature_turn(self):
+        try:
+            creature = self.reaction_order.pop(0)
+        except IndexError:
+            self.creature_in_turn = None
+            return None
+        self.creature_in_turn = creature
+        return self.creature_in_turn
+
+    @property
+    def combat_active(self):
+        return self._combat_active
+
+    @combat_active.setter
+    def combat_active(self, ac):
+        self._combat_active = ac
+
+    @property
+    def creature_in_turn(self):
+        return self._creature_in_turn
+
+    @creature_in_turn.setter
+    def creature_in_turn(self, cr):
+        self._creature_in_turn = cr
+
+    @property
+    def creatures_in_combat(self):
+        return self._creatures_in_combat
+
+    @creatures_in_combat.setter
+    def creatures_in_combat(self, crs):
+        self._creatures_in_combat = crs
+
+    @property
+    def reaction_order(self):
+        return self._reaction_order
+
+    @reaction_order.setter
+    def reaction_order(self, re):
+        self._reaction_order = re
+        self.next_creature_turn()
+
+
 def add_monster_to_random_position(map_data, new_monster):
     """
 
@@ -354,7 +433,7 @@ def handle_attack(attacker, target, _message_log, map_data, entities_in_combat, 
         if isinstance(target, creatures.Hero):
             _message_log.newline("You are knocked out.")
             del entities_in_combat[:]
-            pygame.event.post(pygame.event.Event(pygame.USEREVENT, subtype="combat", combat_situation="end"))
+            push_new_user_event('combat', 'end')
         else:
             _message_log.newline("{target} is knocked out.".format(target=target.name))
             entities_in_combat.remove(target)
@@ -449,22 +528,8 @@ def load_map(map_name=None, map_loader=None, resource_loader=None, hero=None):
     return map_data, path_finder, dirty_drawing, floor_s, world_s
 
 
-def create_combat(map_entities):
-    reaction_order = []
-    creature_in_turn = None
-    entities_in_combat = []
-
-    for entity in map_entities:
-        entities_in_combat.append(entity)
-
-    new_event = pygame.event.Event(pygame.USEREVENT, subtype="combat", combat_situation="start")
-    pygame.event.post(new_event)
-
-    return entities_in_combat, reaction_order, creature_in_turn
-
-
-def push_new_user_event(user_event_type=None, data=None):
-    new_event = pygame.event.Event(pygame.USEREVENT, subtype=user_event_type, data=data)
+def push_new_user_event(subtype=None, data=None):
+    new_event = pygame.event.Event(pygame.USEREVENT, subtype=subtype, data=data)
     pygame.event.post(new_event)
 
 
@@ -488,50 +553,41 @@ def main(screen):
     # ----------------------------
 
     clock = pygame.time.Clock()
-    pathfinder_screen_s = pygame.Surface((10 * 64, 20 * 64))
-    pathfinder_screen_s.set_colorkey(colorBlack)
-
+    camera = Camera()
     resource_loader = resources.Resource_Loader()
-
-    sword_surface = resource_loader.load_sprite('sword')
-
     main_menu = MainMenu()
-
     map_loader = MapLoader(MapData, creatures.NPC)
     map_editor = devtools.Map_editor(resource_loader)
+    message_log = MessageLog(default_font)
+    dialogs = Dialogs()
+    dialog_window_inst = windows.DialogWindow()
+    combat_handler = CombatHandler()
 
     hero = creatures.Hero(surface=resource_loader.load_sprite('hero'), inventory_instance=Inventory())
 
     map_data, path_finder, dirty_drawing, floor_s, world_s = load_map('default', map_loader, resource_loader, hero)
 
+    camera.set_tile_position(hero.positionOnMap)
+    camera.set_viewport_size((10, 10))
+    camera.set_viewport_boundaries((0, 0), map_data.mapBoundaries)
+
+    message_log.position = (screen.get_size()[0] - message_log.render.get_size()[0], 0)
+
+    set_window_frames(dialog_window_inst, resource_loader, drawing)
+
+    sword_surface = resource_loader.load_sprite('sword')
     new_weapon = Weapon(generate_item_name('sword'))
     print hero.inventory
     hero.inventory.add_item(new_weapon)
-
-    camera = Camera(starting_position=hero.positionOnMap, viewport_size=(10, 10))
-    camera.set_viewport_boundaries((0, 0), map_data.mapBoundaries)
-
-    message_log = MessageLog(default_font)
-    message_log.position = (screen.get_size()[0] - message_log.render.get_size()[0], 0)
-
-    dialogs = Dialogs()
-
-    dialog_window_inst = windows.DialogWindow()
-    set_window_frames(dialog_window_inst, resource_loader, drawing)
-
-    # Temporary. Combat is on at the start
-    in_combat = False
-
-    entities_in_combat, reaction_order, creature_in_turn = create_combat(map_data.get_characters_on_map)
-
-    screen.fill(colorBlack)
-
     new_sword = Weapon(generate_item_name(), surface=sword_surface)
     map_data.set_item_on_map(new_sword, (3, 4))
 
     temp_sound = pygame.mixer.Sound('map_change.wav')
-
     default_font_inited = pygame.font.Font(default_font, 17)
+
+    screen.fill(colorBlack)
+
+    combat_handler.create_combat(map_data.get_characters_on_map)
 
     # MAINLOOP--------------------------
     while 1:
@@ -552,56 +608,54 @@ def main(screen):
                             map_data, path_finder, dirty_drawing, floor_s, world_s = load_map('map_arena.map',
                                                                                               map_loader,
                                                                                               resource_loader, hero)
-                            combat_variables = create_combat(map_data.get_characters_on_map)
-                            entities_in_combat, reaction_order, creature_in_turn = combat_variables
+
+                            push_new_user_event('combat', 'level_init')
+
                             camera.set_viewport_boundaries((0, 0), map_data.mapBoundaries)
 
                             temp_sound.play()
                     except IndexError:
-                        print "Invalid event data: {}".format(event.data)
+                        print "Invalid map_change data: {}".format(event.data)
 
                 elif event.subtype is 'combat':
+                    if event.data == 'level_init':
+                        combat_handler.create_combat(map_data.get_characters_on_map)
 
-                    if event.combat_situation == 'start':
-                        in_combat = True
-                        reaction_order = dice.roll_reactions(entities_in_combat)
+                    if event.data == 'start':
+                        combat_handler.combat_active = True
+                        combat_handler.reaction_order = dice.roll_reactions(combat_handler.creatures_in_combat)
                         message_log.newline('RR')
-                        pygame.event.post(pygame.event.Event(pygame.USEREVENT,
-                                                             subtype="combat", combat_situation='first_turn'))
+                        push_new_user_event('combat', 'first_turn')
 
-                    if event.combat_situation == 'first_turn':
-                        creature_in_turn = reaction_order[0]
-                        if creature_in_turn == hero:
+                    if event.data == 'first_turn':
+                        if combat_handler.creature_in_turn == hero:
                             message_log.newline("You start")
+                        elif isinstance(combat_handler.creature_in_turn, creatures.NPC):
+                            message_log.newline('{} starts'.format(combat_handler.creature_in_turn.name))
                         else:
-                            message_log.newline('{} starts'.format(reaction_order[0].name))
+                            print 'ERROR: first turn invalid creature in turn {}'.format(
+                                combat_handler.creature_in_turn)
 
-                    if event.combat_situation == 'turn_change':
-                        try:
-                            reaction_order.remove(creature_in_turn)
-                        except ValueError:
-                            print '{} not in reaction order.'.format(creature_in_turn)
+                    if event.data == 'turn_change':
+                        combat_handler.next_creature_turn()
 
-                        try:
-                            creature_in_turn = reaction_order[0]
-                            if creature_in_turn == hero:
+                        if combat_handler.creature_in_turn != None:
+                            if combat_handler.creature_in_turn == hero:
                                 message_log.newline("Your turn.")
                             else:
-                                message_log.newline("{}'s turn.".format(reaction_order[0].name))
-                        except IndexError:
-                            creature_in_turn = None
-                            pygame.event.post(pygame.event.Event(pygame.USEREVENT,
-                                                                 subtype="combat", combat_situation='end_of_phase'))
+                                message_log.newline("{}'s turn.".format(combat_handler.creature_in_turn.name))
+                        else:
+                            push_new_user_event('combat', 'end_of_phase')
 
-                    if event.combat_situation == "end_of_phase" and in_combat:
-                        reaction_order = dice.roll_reactions(entities_in_combat)
-                        creature_in_turn = None
+                    if event.data == "end_of_phase":
+                        if combat_handler.combat_active == False:
+                            print "ERROR: end_of_phase while combat not active"
+                        combat_handler.reaction_order = dice.roll_reactions(combat_handler.creatures_in_combat)
                         message_log.newline('EOP- RR')
-                        pygame.event.post(pygame.event.Event(pygame.USEREVENT,
-                                                             subtype="combat", combat_situation='first_turn'))
+                        push_new_user_event('combat', 'first_turn')
 
-                    if event.combat_situation == "end":
-                        in_combat = False
+                    if event.data == "end":
+                        combat_handler.combat_active = False
 
                 elif event.subtype is 'menu':
                     main_menu.launch(screen)
@@ -645,7 +699,7 @@ def main(screen):
                 elif event.key == pygame.K_KP_PLUS:
                     new_creature = creatures.NPC(resource_loader.load_sprite('thug'))
                     npc = add_monster_to_random_position(map_data, new_creature)
-                    entities_in_combat.append(npc)
+                    combat_handler.add_to_combat(npc)
                 elif event.key == pygame.K_i:
                     message_log.newline("-----Inventory:-----")
                     for item in hero.inventory.get_items:
@@ -663,7 +717,7 @@ def main(screen):
                     message_log.newline('God mode: {}'.format(dev_hero_undying))
                 # F2: Menu
                 elif event.key == pygame.K_F2:
-                    push_new_user_event(user_event_type='menu')
+                    push_new_user_event('menu')
                 # F3: MapEditor
                 elif event.key == pygame.K_F3:
                     map_editor.launch(map_data, screen)
@@ -680,13 +734,12 @@ def main(screen):
                 elif event.key == pygame.K_TAB:
                     sys.exit()
 
-        if in_combat is True:
+        if combat_handler.combat_active:
 
-            if isinstance(creature_in_turn, creatures.Hero):
+            if isinstance(combat_handler.creature_in_turn, creatures.Hero):
                 hero_makes_decision = hero_turn(hero, map_data, message_log)
                 if hero_makes_decision:
-                    pygame.event.post(pygame.event.Event(pygame.USEREVENT,
-                                                         subtype="combat", combat_situation="turn_change"))
+                    push_new_user_event('combat', 'turn_change')
 
                     if hero.intent.type is hero.intent.MOVE:
                         map_data.attempt_move("char", hero.positionOnMap, direction=hero.intent.direction)
@@ -694,7 +747,8 @@ def main(screen):
 
                     elif hero.intent.type is hero.intent.ATTACK:
                         handle_attack(hero, hero.intent.target,
-                                      message_log, map_data, entities_in_combat, reaction_order,
+                                      message_log, map_data, combat_handler.creatures_in_combat,
+                                      combat_handler.reaction_order,
                                       sword_surface=sword_surface)
 
                     elif hero.intent.type == hero.intent.WAIT:
@@ -702,28 +756,26 @@ def main(screen):
                     else:
                         raise "No Hero intention_:{}".format(hero.intent.type)
 
-            elif isinstance(creature_in_turn, creatures.NPC):
-                npc = creature_in_turn
+            elif isinstance(combat_handler.creature_in_turn, creatures.NPC):
+                npc = combat_handler.creature_in_turn
                 path = path_finder.find_path_between_points(npc.positionOnMap, hero.positionOnMap,
                                                             report_time=report_pathfinder_time)
                 if enable_pathfinder_screen:
                     pass
                 if path == 'path not found' or path is None:
-                    pygame.event.post(pygame.event.Event(pygame.USEREVENT,
-                                                         subtype="combat", combat_situation="turn_change"))
+                    push_new_user_event('combat', 'turn_change')
                 else:
                     move_success = map_data.attempt_move("char", npc.positionOnMap, destination=path[1])
                     if move_success is True:
                         npc.set_position(path[1])
-                        pygame.event.post(pygame.event.Event(pygame.USEREVENT,
-                                                             subtype="combat", combat_situation="turn_change"))
+                        push_new_user_event('combat', 'turn_change')
                     elif isinstance(move_success, creatures.NPC):
-                        pygame.event.post(pygame.event.Event(pygame.USEREVENT,
-                                                             subtype="combat", combat_situation="turn_change"))
+                        push_new_user_event('combat', 'turn_change')
                     elif isinstance(move_success, creatures.Hero):
-                        handle_attack(npc, hero, message_log, map_data, entities_in_combat, reaction_order)
-                        pygame.event.post(pygame.event.Event(pygame.USEREVENT,
-                                                             subtype="combat", combat_situation="turn_change"))
+                        handle_attack(npc, hero, message_log, map_data, combat_handler.creatures_in_combat,
+                                      combat_handler.reaction_order)
+
+                        push_new_user_event('combat', 'turn_change')
                     else:
                         print "ERRORROROREREERRROR"
 

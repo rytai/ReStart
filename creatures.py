@@ -11,17 +11,15 @@ class Creature:
     rect = 0
     positionOnMap = (0, 0)
 
-    intent = None
     inventory = None
 
-    def __init__(self, surface=None, intent_instance=None, inventory_instance=None):
+    def __init__(self, surface=None, inventory_instance=None):
         self.name = ""
         self.surface = surface
         self.rect = self.surface.get_rect()
 
         self.sheet = self.Sheet()
 
-        self.intent = intent_instance
         self.inventory = inventory_instance
 
     def move(self, x, y):
@@ -107,21 +105,50 @@ class Creature:
 
 
 class Hero(Creature):
-    def __init__(self, surface=None, intent_instance=None, inventory_instance=None):
+    inventory = None
+    intent = None
+
+    def __init__(self, surface=None, inventory_instance=None):
         """
 
         :rtype : Hero
         """
-        Creature.__init__(self, surface, intent_instance, inventory_instance)
+        Creature.__init__(self, surface, inventory_instance)
 
         self.name = "Hero"
+        self.intent = self.Intent()
+
+    class Intent:
+        MOVE = 1
+        ATTACK = 2
+        WAIT = 3
+        type = 0
+        target = 0
+        direction = (0, 0)
+
+        def __init__(self):
+            """
+
+            :rtype : self
+            """
+            self.MOVE = 1
+            self.ATTACK = 2
+            self.WAIT = 3
 
 
 class NPC(Creature):
-    def __init__(self, surface=None, intent_instance=None, inventory_instance=None):
-        Creature.__init__(self, surface, intent_instance, inventory_instance)
+    state_of_mind = None
 
-    def make_random_move_intent(self):
-        self.intent.type = self.intent.MOVE
-        self.intent.direction = random.randint(-1, 1), random.randint(-1, 1)
-        return self.intent
+    def __init__(self, surface=None, inventory_instance=None):
+        Creature.__init__(self, surface, inventory_instance)
+
+    def update(self):
+        pass
+
+
+class StateOfMind():
+    """Peaceful: Doesn't attack
+    Homing missile: Finds you from anywhere and attacks"""
+    PEACEFUL = 'peaceful'
+    ATTACK_ON_SIGHT = 'attackonsight'
+    HOMING_MISSILE = 'homingmissile'

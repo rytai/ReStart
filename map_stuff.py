@@ -8,13 +8,12 @@ __author__ = 'Kodex'
 class MapLoader:
     _MapData = None
     _NPC = None
-    _Intent = None
     map_data_list = []
     current_map = None
 
     map_data_folder = os.path.join('Resources', 'Levels')
 
-    def __init__(self, _MapData, _NPC, _Intent):
+    def __init__(self, _MapData, _NPC):
         """
 
 
@@ -24,7 +23,6 @@ class MapLoader:
         self.default_map_name = "map_default.map"
         self._MapData = _MapData
         self._NPC = _NPC
-        self._Intent = _Intent
 
     def load_map_named(self, map_name, resource_loader_inst, inventory_class):
 
@@ -72,7 +70,7 @@ class MapLoader:
             elif _entity[0] == 1:
                 new_entity_surface = resource_loader_inst.load_sprite('thug')
                 new_inventory = inventory_class()
-                new_entity = NPC(new_entity_surface, intent_instance=self._Intent(), inventory_instance=new_inventory)
+                new_entity = NPC(new_entity_surface, inventory_instance=new_inventory)
                 new_entity.name = "Thug"
                 assert isinstance(new_entity, NPC)
                 new_entity.move(*_entity[1])

@@ -8,7 +8,7 @@ from PathFinder import PathFinder
 from dialogs import *
 import drawing
 from map_stuff import MapData, MapLoader
-from creatures import Creature, Hero, NPC
+import creatures as creatures
 from item_stuff import *
 import dice as dice
 import resources
@@ -243,24 +243,6 @@ class MainMenu(MenuHandler):
         return new_surface
 
 
-class Intent:
-    MOVE = 1
-    ATTACK = 2
-    WAIT = 3
-    type = 0
-    target = 0
-    direction = (0, 0)
-
-    def __init__(self):
-        """
-
-        :rtype : self
-        """
-        self.MOVE = 1
-        self.ATTACK = 2
-        self.WAIT = 3
-
-
 class Camera:
     current_viewport = pygame.Rect((0, 0, 0, 0))
     viewport_boundaries = pygame.Rect(0, 0, 0, 0)
@@ -331,7 +313,7 @@ def hero_turn(hero, map_data, message_log):
         move_report = map_data.attempt_move("char", hero.positionOnMap, direction=hero.intent.direction, checkonly=True)
 
         # Intent to move was actually intent to attack
-        if isinstance(move_report, Creature):
+        if isinstance(move_report, creatures.Creature):
             hero.intent.type = hero.intent.ATTACK
             hero.intent.target = move_report
             return True
@@ -369,7 +351,7 @@ def handle_attack(attacker, target, _message_log, map_data, entities_in_combat, 
     _message_log.newline(attacker.name + str(report_from_attack))
 
     if target.sheet.fatigue == 4:
-        if isinstance(target, Hero):
+        if isinstance(target, creatures.Hero):
             _message_log.newline("You are knocked out.")
             del entities_in_combat[:]
             pygame.event.post(pygame.event.Event(pygame.USEREVENT, subtype="combat", combat_situation="end"))
@@ -442,7 +424,7 @@ def load_map(map_name=None, map_loader=None, resource_loader=None, hero=None):
     assert isinstance(map_loader, MapLoader)
     assert isinstance(resource_loader, resources.Resource_Loader)
     assert PathFinder is not None
-    assert isinstance(hero, Hero)
+    assert isinstance(hero, creatures.Hero)
     # Kartan lataaminen
     if map_name == 'default':
         map_data, hero_position = map_loader.load_default_map(resource_loader, Inventory)
@@ -509,18 +491,16 @@ def main(screen):
     pathfinder_screen_s = pygame.Surface((10 * 64, 20 * 64))
     pathfinder_screen_s.set_colorkey(colorBlack)
 
-    intent = Intent()
-
     resource_loader = resources.Resource_Loader()
 
     sword_surface = resource_loader.load_sprite('sword')
 
     main_menu = MainMenu()
 
-    map_loader = MapLoader(MapData, NPC, Intent)
+    map_loader = MapLoader(MapData, creatures.NPC)
     map_editor = devtools.Map_editor(resource_loader)
 
-    hero = Hero(surface=resource_loader.load_sprite('hero'), intent_instance=Intent(), inventory_instance=Inventory())
+    hero = creatures.Hero(surface=resource_loader.load_sprite('hero'), inventory_instance=Inventory())
 
     map_data, path_finder, dirty_drawing, floor_s, world_s = load_map('default', map_loader, resource_loader, hero)
 
@@ -636,35 +616,35 @@ def main(screen):
                 if print_keypresses:
                     print event.key
                 if event.key == pygame.K_SPACE:
-                    hero.intent.type = intent.WAIT
+                    hero.intent.type = hero.intent.WAIT
                 elif event.key == pygame.K_UP or event.key == pygame.K_KP8:
-                    hero.intent.type = intent.MOVE
+                    hero.intent.type = hero.intent.MOVE
                     hero.intent.direction = (0, -1)
                 elif event.key == pygame.K_DOWN or event.key == pygame.K_KP2:
-                    hero.intent.type = intent.MOVE
+                    hero.intent.type = hero.intent.MOVE
                     hero.intent.direction = (0, 1)
                 elif event.key == pygame.K_LEFT or event.key == pygame.K_KP4:
-                    hero.intent.type = intent.MOVE
+                    hero.intent.type = hero.intent.MOVE
                     hero.intent.direction = (-1, 0)
                 elif event.key == pygame.K_RIGHT or event.key == pygame.K_KP6:
-                    hero.intent.type = intent.MOVE
+                    hero.intent.type = hero.intent.MOVE
                     hero.intent.direction = (1, 0)
                 elif event.key == pygame.K_KP7:
-                    hero.intent.type = intent.MOVE
+                    hero.intent.type = hero.intent.MOVE
                     hero.intent.direction = (-1, -1)
                 elif event.key == pygame.K_KP9:
-                    hero.intent.type = intent.MOVE
+                    hero.intent.type = hero.intent.MOVE
                     hero.intent.direction = (1, -1)
                 elif event.key == pygame.K_KP3:
-                    hero.intent.type = intent.MOVE
+                    hero.intent.type = hero.intent.MOVE
                     hero.intent.direction = (1, 1)
                 elif event.key == pygame.K_KP1:
-                    hero.intent.type = intent.MOVE
+                    hero.intent.type = hero.intent.MOVE
                     hero.intent.direction = (-1, 1)
 
                 elif event.key == pygame.K_KP_PLUS:
-                    npc = add_monster_to_random_position(map_data, NPC(resource_loader.load_sprite('thug'),
-                                                                       Intent(), Inventory()))
+                    new_creature = creatures.NPC(resource_loader.load_sprite('thug'))
+                    npc = add_monster_to_random_position(map_data, new_creature)
                     entities_in_combat.append(npc)
                 elif event.key == pygame.K_i:
                     message_log.newline("-----Inventory:-----")
@@ -702,27 +682,27 @@ def main(screen):
 
         if in_combat is True:
 
-            if isinstance(creature_in_turn, Hero):
+            if isinstance(creature_in_turn, creatures.Hero):
                 hero_makes_decision = hero_turn(hero, map_data, message_log)
                 if hero_makes_decision:
                     pygame.event.post(pygame.event.Event(pygame.USEREVENT,
                                                          subtype="combat", combat_situation="turn_change"))
 
-                    if hero.intent.type is intent.MOVE:
+                    if hero.intent.type is hero.intent.MOVE:
                         map_data.attempt_move("char", hero.positionOnMap, direction=hero.intent.direction)
                         hero.move(*hero.intent.direction)
 
-                    elif hero.intent.type is intent.ATTACK:
+                    elif hero.intent.type is hero.intent.ATTACK:
                         handle_attack(hero, hero.intent.target,
                                       message_log, map_data, entities_in_combat, reaction_order,
                                       sword_surface=sword_surface)
 
-                    elif hero.intent.type == intent.WAIT:
+                    elif hero.intent.type == hero.intent.WAIT:
                         pass
                     else:
                         raise "No Hero intention_:{}".format(hero.intent.type)
 
-            elif isinstance(creature_in_turn, NPC):
+            elif isinstance(creature_in_turn, creatures.NPC):
                 npc = creature_in_turn
                 path = path_finder.find_path_between_points(npc.positionOnMap, hero.positionOnMap,
                                                             report_time=report_pathfinder_time)
@@ -734,15 +714,13 @@ def main(screen):
                 else:
                     move_success = map_data.attempt_move("char", npc.positionOnMap, destination=path[1])
                     if move_success is True:
-                        # npc.move(*npc.intent.direction)
                         npc.set_position(path[1])
                         pygame.event.post(pygame.event.Event(pygame.USEREVENT,
                                                              subtype="combat", combat_situation="turn_change"))
-                    elif isinstance(move_success, NPC):
-                        npc.intent = Intent.WAIT
+                    elif isinstance(move_success, creatures.NPC):
                         pygame.event.post(pygame.event.Event(pygame.USEREVENT,
                                                              subtype="combat", combat_situation="turn_change"))
-                    elif isinstance(move_success, Hero):
+                    elif isinstance(move_success, creatures.Hero):
                         handle_attack(npc, hero, message_log, map_data, entities_in_combat, reaction_order)
                         pygame.event.post(pygame.event.Event(pygame.USEREVENT,
                                                              subtype="combat", combat_situation="turn_change"))

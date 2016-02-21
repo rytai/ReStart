@@ -363,6 +363,50 @@ class CombatHandler(object):
         self.next_creature_turn()
 
 
+class CreatureActionHandler(object):
+    """Handles movement
+    Every action, except combat/attacking"""
+    creature_list = []
+
+    def __init__(self):
+        self.creature_list = []
+
+    @property
+    def creature_list(self):
+        return self._creature_list
+
+    @creature_list.setter
+    def creature_list(self, _list):
+        self._creature_list = _list
+        self.make_hero_first()
+
+    def add_creature(self, cr, position=None):
+        assert issubclass(cr, creatures.Creature)
+        if position == None:
+            self.creature_list.append(cr)
+        else:
+            self.creature_list.insert(cr, position)
+
+    def remove_creature(self, cr):
+        assert issubclass(cr, creatures.Creature)
+        try:
+            self.creature_list.pop(cr)
+        except IndexError, err:
+            print "CrAcHandler, cannot pop {}, no such entry in list".format(cr)
+            return None
+
+    def make_hero_first(self):
+        for creature in self.creature_list:
+            if isinstance(creature, creatures.Hero):
+                self.add_creature(self.remove_creature(creature), 0)
+
+    def handle_turn(self, creature=None):
+        if creature == None:
+            creature = []
+            creature.pop()
+
+
+
 def add_monster_to_random_position(map_data, new_monster):
     """
 
@@ -650,9 +694,10 @@ def main(screen):
                     if event.data == "end_of_phase":
                         if combat_handler.combat_active == False:
                             print "ERROR: end_of_phase while combat not active"
-                        combat_handler.reaction_order = dice.roll_reactions(combat_handler.creatures_in_combat)
-                        message_log.newline('EOP- RR')
-                        push_new_user_event('combat', 'first_turn')
+                        else:
+                            combat_handler.reaction_order = dice.roll_reactions(combat_handler.creatures_in_combat)
+                            message_log.newline('EOP- RR')
+                            push_new_user_event('combat', 'first_turn')
 
                     if event.data == "end":
                         combat_handler.combat_active = False
@@ -739,8 +784,6 @@ def main(screen):
             if isinstance(combat_handler.creature_in_turn, creatures.Hero):
                 hero_makes_decision = hero_turn(hero, map_data, message_log)
                 if hero_makes_decision:
-                    push_new_user_event('combat', 'turn_change')
-
                     if hero.intent.type is hero.intent.MOVE:
                         map_data.attempt_move("char", hero.positionOnMap, direction=hero.intent.direction)
                         hero.move(*hero.intent.direction)
@@ -755,6 +798,7 @@ def main(screen):
                         pass
                     else:
                         raise "No Hero intention_:{}".format(hero.intent.type)
+                    push_new_user_event('combat', 'turn_change')
 
             elif isinstance(combat_handler.creature_in_turn, creatures.NPC):
                 npc = combat_handler.creature_in_turn
@@ -778,6 +822,9 @@ def main(screen):
                         push_new_user_event('combat', 'turn_change')
                     else:
                         print "ERRORROROREREERRROR"
+
+        else:  # Combat not active.
+            pass
 
         camera.set_tile_position(hero.positionOnMap)
 

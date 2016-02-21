@@ -286,11 +286,10 @@ class Camera:
 
 class CreatureActionHandler(object):
     creature_list = []
-    creature_in_turn = []
+    creature_in_turn = None
 
     def __init__(self):
         self.creature_list = []
-        self.creature_in_turn = []
 
     def add_creature(self, entity_or_list, position=None):
         try:
@@ -319,10 +318,7 @@ class CreatureActionHandler(object):
     # Deal with one creature at a time, starting with player.
     def handle_turn(self, hero, message_log, map_data, sword_surface, path_finder=None, creature=None):
         if not creature:
-            try:
-                creature = self.creature_in_turn
-            except IndexError, err:
-                pass
+            creature = self.creature_in_turn
         # Deal with hero's turn.
         if isinstance(creature, creatures.Hero):
             return self.hero_turn(creature, map_data, message_log, sword_surface)
@@ -352,7 +348,10 @@ class CreatureActionHandler(object):
                 output = False
 
             if output is True:
-                push_new_user_event('combat', 'turn_change')
+                if isinstance(self, CombatHandler):
+                    push_new_user_event('combat', 'turn_change')
+                else:
+                    push_new_user_event('turn_order', 'turn_change')
 
 
         else:  # There's no intent. Fall back.
@@ -420,11 +419,14 @@ class CreatureActionHandler(object):
 class CombatHandler(CreatureActionHandler):
     combat_active = False
     reaction_order = None
+    combat_phase_done = False
 
     def __init__(self):
         CreatureActionHandler.__init__(self)
         self.combat_active = False
         self.reaction_order = []
+        self.creature_in_turn = None
+        self.combat_phase_done = False
 
     def create_combat(self, map_entities=None):
         if map_entities:
@@ -437,7 +439,7 @@ class CombatHandler(CreatureActionHandler):
             push_new_user_event('combat', 'start')
 
     def reset_combat(self):
-        self.creature_list = None
+        self.creature_list = []
         self.combat_active = False
         self.reaction_order = []
         self.creature_in_turn = None
@@ -450,7 +452,7 @@ class CombatHandler(CreatureActionHandler):
             return None
         except TypeError, err:
             print err
-            print cr1
+            print cr
 
         self.check_combat_state()
 
@@ -550,14 +552,67 @@ class CombatHandler(CreatureActionHandler):
         self._reaction_order = re
         self.next_creature_turn()
 
+    @property
+    def combat_phase_done(self):
+        return self._combat_phase_done
+
+    @combat_phase_done.setter
+    def combat_phase_done(self, bo):
+        self._combat_phase_done = bo
+
 
 class PeacefulActionHandler(CreatureActionHandler):
     """Handles movement
     Every action, except combat/attacking"""
+    turn_ordered_creatures = []
 
     def __init__(self):
         CreatureActionHandler.__init__(self)
-        pass
+        self.current_creature_index = 0
+
+    def npc_turn(self, npc, hero, message_log, map_data, sword_surface, path_finder):
+        """
+        :type npc: NPC
+        :type map_data: MapData
+        """
+        npc_action = npc.get_action()
+        if npc_action == 'wait':
+            return True
+        elif npc_action == 'step to random':
+            choices = [(1, 0), (-1, 0), (0, -1), (0, 1)]
+            random.shuffle(choices)
+            for direction_of_choice in choices:
+                move_report = map_data.attempt_move('char', npc.positionOnMap, direction=direction_of_choice)
+                if move_report is True:
+                    npc.move(*direction_of_choice)
+                    break
+                else:
+                    choices.remove(direction_of_choice)
+                    random.shuffle(choices)
+
+        push_new_user_event('turn_order', 'turn_change')
+
+    def next_creature(self):
+        self.current_creature_index += 1
+
+    def reset_creature_index(self):
+        self.current_creature_index = 0
+
+    @property
+    def creature_in_turn(self):
+        if self.creature_list.__len__() != 0:
+            # There is creature at current index.
+            try:
+                cur_creature = self.creature_list[self.current_creature_index]
+            # Index out of bounds, return to 0 and end the cycling of creatures->Next turn
+            except IndexError:
+                cur_creature = False
+                self.current_creature_index = 0
+                push_new_user_event('turn_order', 'end_phase')
+        else:
+            cur_creature = False
+
+        return cur_creature
 
 
 def add_monster_to_random_position(map_data, new_monster):
@@ -679,7 +734,6 @@ def set_window_frames(dialog_window_inst, resource_loader, drawing, id=None):
 
 def main(screen):
     # -----------Debug------------
-    report_pathfinder_time = False
 
     print_keypresses = False
 
@@ -696,7 +750,7 @@ def main(screen):
     dialogs = Dialogs()
     dialog_window_inst = windows.DialogWindow()
     combat_handler = CombatHandler()
-    cr_action_handler = PeacefulActionHandler()
+    peaceful_action_handler = PeacefulActionHandler()
 
     hero = creatures.Hero(surface=resource_loader.load_sprite('hero'), inventory_instance=Inventory())
 
@@ -723,6 +777,7 @@ def main(screen):
     screen.fill(colorBlack)
 
     combat_handler.create_combat(map_data.get_characters_on_map)
+    push_new_user_event('combat', 'level_init')
 
     # MAINLOOP--------------------------
     while 1:
@@ -740,10 +795,8 @@ def main(screen):
                 if event.subtype is 'map_change':
                     try:
                         if event.data[0] == '@':
-                            map_data, path_finder, dirty_drawing, floor_s, world_s = load_map('map_arena.map',
-                                                                                              map_loader,
-                                                                                              resource_loader, hero)
-
+                            map_load_return = load_map('map_arena.map', map_loader, resource_loader, hero)
+                            map_data, path_finder, dirty_drawing, floor_s, world_s = map_load_return
                             push_new_user_event('combat', 'level_init')
 
                             camera.set_viewport_boundaries((0, 0), map_data.mapBoundaries)
@@ -759,16 +812,18 @@ def main(screen):
                             if creature.in_combat:
                                 combat_handler.add_creature(creature)
                             else:
-                                cr_action_handler.add_creature(creature)
+                                peaceful_action_handler.add_creature(creature)
                         combat_handler.create_combat()
 
-                    if event.data == 'start':
+                    elif event.data == 'start':
                         combat_handler.combat_active = True
                         combat_handler.reaction_order = dice.roll_reactions(combat_handler.creature_list)
-                        message_log.newline('RR')
-                        push_new_user_event('combat', 'first_turn')
+                        message_log.newline('Entering combat.')
+                        push_new_user_event('combat', 'start_phase')
 
-                    if event.data == 'first_turn':
+                    elif event.data == 'start_phase':
+                        combat_handler.combat_phase_done = False
+                        combat_handler.reaction_order = dice.roll_reactions(combat_handler.creature_list)
                         if combat_handler.creature_in_turn == hero:
                             message_log.newline("You start")
                         elif isinstance(combat_handler.creature_in_turn, creatures.NPC):
@@ -777,10 +832,10 @@ def main(screen):
                             print 'ERROR: first turn invalid creature in turn {}'.format(
                                 combat_handler.creature_in_turn)
 
-                    if event.data == 'turn_change':
+                    elif event.data == 'turn_change':
                         combat_handler.next_creature_turn()
 
-                        if combat_handler.creature_in_turn != None:
+                        if combat_handler.creature_in_turn is not None:
                             if combat_handler.creature_in_turn == hero:
                                 message_log.newline("Your turn.")
                             else:
@@ -788,16 +843,28 @@ def main(screen):
                         else:
                             push_new_user_event('combat', 'end_of_phase')
 
-                    if event.data == "end_of_phase":
-                        if combat_handler.combat_active == False:
-                            print "ERROR: end_of_phase while combat not active"
-                        else:
-                            combat_handler.reaction_order = dice.roll_reactions(combat_handler.creature_list)
-                            message_log.newline('EOP- RR')
-                            push_new_user_event('combat', 'first_turn')
+                    elif event.data == "end_of_phase":
+                        message_log.newline('End of combat phase.')
+                        combat_handler.combat_phase_done = True
+                        push_new_user_event('turn_order', 'start_phase')
 
-                    if event.data == "end":
+                    elif event.data == "end":
                         combat_handler.combat_active = False
+
+                    else:
+                        print "Invalid combat event data:{}".format(event.data)
+
+                # NON-COMBAT TURNS
+                elif event.subtype is 'turn_order':
+                    if event.data is 'start_phase':
+                        peaceful_action_handler.reset_creature_index()
+                    if event.data is 'turn_change':
+                        peaceful_action_handler.next_creature()
+                    if event.data is 'end_phase':
+                        if combat_handler.combat_active == True:
+                            push_new_user_event('combat', 'start_phase')
+                        else:
+                            push_new_user_event('turn_order', 'start_phase')
 
                 elif event.subtype is 'menu':
                     main_menu.launch(screen)
@@ -838,10 +905,15 @@ def main(screen):
                     hero.intent.type = hero.intent.MOVE
                     hero.intent.direction = (-1, 1)
 
+                # + : Add enemy
                 elif event.key == pygame.K_KP_PLUS:
                     new_creature = creatures.NPC(resource_loader.load_sprite('thug'))
                     npc = add_monster_to_random_position(map_data, new_creature)
                     combat_handler.add_creature(npc)
+                # c : Chat
+                elif event.key == pygame.K_c:
+                    print 'chattychat'
+                # i : Inventory
                 elif event.key == pygame.K_i:
                     message_log.newline("-----Inventory:-----")
                     for item in hero.inventory.get_items:
@@ -876,11 +948,13 @@ def main(screen):
                 elif event.key == pygame.K_TAB:
                     sys.exit()
 
-        if combat_handler.combat_active:
+        # Handle combat
+        if combat_handler.combat_active and not combat_handler.combat_phase_done:
             combat_handler.handle_turn(hero, message_log, map_data, sword_surface, path_finder)
-
-        else:  # After combat/Combat not active.
-            pass
+        else:
+            # Handle other npc/hero actions.
+            if peaceful_action_handler.handle_turn(hero, message_log, map_data, sword_surface, path_finder):
+                push_new_user_event('turn_order', 'turn_change')
 
         camera.set_tile_position(hero.positionOnMap)
 

@@ -13,7 +13,7 @@ class Creature:
 
     inventory = None
 
-    in_combat = True
+    in_combat = False
 
     def __init__(self, surface=None, inventory_instance=None):
         self.name = ""
@@ -140,17 +140,48 @@ class Hero(Creature):
 
 class NPC(Creature):
     state_of_mind = None
+    action_queue = []
 
     def __init__(self, surface=None, inventory_instance=None):
         Creature.__init__(self, surface, inventory_instance)
+        self.action_queue = []
+        self.state_of_mind = StateOfMind()
 
-    def update(self):
-        pass
+    def get_action(self):
+        # No actions in the queue. Get some.
+        if self.action_queue.__len__() == 0:
+            self.set_action()
+            return self.action_queue.pop()
+        else:
+            return self.action_queue.pop()
+
+    def set_action(self, action_list=None):
+        state = self.state_of_mind.get
+        if state is self.state_of_mind.WANDERING:
+            if random.randint(0, 1) == 0:
+                for i in range(0, random.randint(0, 2)):
+                    self.action_queue.append('wait')
+                self.action_queue.append('step to random')
+                self.action_queue.reverse()
+            else:
+                self.action_queue.append('step to random')
 
 
-class StateOfMind():
+class StateOfMind(object):
     """Peaceful: Doesn't attack
     Homing missile: Finds you from anywhere and attacks"""
-    PEACEFUL = 'peaceful'
+    get = None
+    WANDERING = 'wandering'
     ATTACK_ON_SIGHT = 'attackonsight'
     HOMING_MISSILE = 'homingmissile'
+
+    def __init__(self):
+        self.get = self.WANDERING
+
+    @property
+    def get(self):
+        return self._get
+
+    @get.setter
+    def get(self, state):
+        self._get = state

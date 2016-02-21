@@ -401,7 +401,7 @@ class CreatureActionHandler(object):
                 self.add_creature(self.remove_creature(creature), 0)
 
     def handle_turn(self, creature=None):
-        if creature == None:
+        if not creature:
             creature = []
             creature.pop()
 
@@ -588,7 +588,6 @@ def set_window_frames(dialog_window_inst, resource_loader, drawing, id=None):
 
 def main(screen):
     # -----------Debug------------
-    enable_pathfinder_screen = False  # Draws the found pathfinder path
     report_pathfinder_time = False
 
     print_keypresses = False
@@ -804,8 +803,6 @@ def main(screen):
                 npc = combat_handler.creature_in_turn
                 path = path_finder.find_path_between_points(npc.positionOnMap, hero.positionOnMap,
                                                             report_time=report_pathfinder_time)
-                if enable_pathfinder_screen:
-                    pass
                 if path == 'path not found' or path is None:
                     push_new_user_event('combat', 'turn_change')
                 else:
@@ -823,22 +820,15 @@ def main(screen):
                     else:
                         print "ERRORROROREREERRROR"
 
-        else:  # Combat not active.
+        else:  # After combat/Combat not active.
             pass
 
         camera.set_tile_position(hero.positionOnMap)
-
-        if enable_pathfinder_screen:
-            dirty_drawing.issue_world_surface_redraw()
 
         dirty_drawing.draw(screen, world_s, camera, floor_s, map_data)
 
         if message_log.get_is_dirty is True:
             dirty_drawing.draw_message_log(screen, message_log)
-
-        if enable_pathfinder_screen:
-            pass
-            # dirty_drawing.draw_pathfinder_screen(screen, pathfinder_screen_s)
 
         pygame.display.flip()
 

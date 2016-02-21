@@ -1,3 +1,5 @@
+import os
+
 import resources
 from creatures import NPC
 __author__ = 'Kodex'
@@ -6,11 +8,12 @@ __author__ = 'Kodex'
 class MapLoader:
     _MapData = None
     _NPC = None
-    _Intent = None
     map_data_list = []
     current_map = None
 
-    def __init__(self, _MapData, _NPC, _Intent):
+    map_data_folder = os.path.join('Resources', 'Levels')
+
+    def __init__(self, _MapData, _NPC):
         """
 
 
@@ -20,7 +23,6 @@ class MapLoader:
         self.default_map_name = "map_default.map"
         self._MapData = _MapData
         self._NPC = _NPC
-        self._Intent = _Intent
 
     def load_map_named(self, map_name, resource_loader_inst, inventory_class):
 
@@ -68,7 +70,7 @@ class MapLoader:
             elif _entity[0] == 1:
                 new_entity_surface = resource_loader_inst.load_sprite('thug')
                 new_inventory = inventory_class()
-                new_entity = NPC(new_entity_surface, intent_instance=self._Intent(), inventory_instance=new_inventory)
+                new_entity = NPC(new_entity_surface, inventory_instance=new_inventory)
                 new_entity.name = "Thug"
                 assert isinstance(new_entity, NPC)
                 new_entity.move(*_entity[1])
@@ -122,9 +124,9 @@ class MapLoader:
         _string_position += _amount
         return _data_bit, _string_position
 
-    @staticmethod
-    def load_map_data(_map_name):
-        f = open(_map_name, 'r')
+    def load_map_data(self, _map_name):
+        map_file_name = os.path.join(self.map_data_folder, _map_name)
+        f = open(map_file_name, 'r')
 
         map_size = f.readline()
 

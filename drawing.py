@@ -39,27 +39,72 @@ def render_window(dest_surface, window_inst, default_font):
     surface.fill(bg_color)
     if bg_image:
         surface.blit(bg_image, (0, 0))
+    # -- Frames --
+    print surface_rect.topleft
+    surface.blit(window_inst.get_frame_surface, (0, 0))
 
     # -- Dialog --
     try:
         text_lines = window_inst.get_text_lines
         title = window_inst.get_title
 
-        color = (0, 0, 0)
-        bg_color = (255, 255, 255)
+        color = (255, 255, 255)
+        bg_color = (0, 0, 0)
 
-        text_pos = (20, 40)
+        text_pos = (30, 40)
         for line in text_lines:
             text_pos = text_pos[0], text_pos[1] + dialog_line_space_
-            render_text_on_surface(surface, default_font, line, position=text_pos, color=color, bg_color=bg_color)
+            if line.__len__() != 0:
+                render_text_on_surface(surface, default_font, line, position=text_pos, color=color, bg_color=bg_color)
 
-        text_pos = (10, 15)
+        text_pos = (20, 15)
         render_text_on_surface(surface, default_font, title, position=text_pos, color=color, bg_color=bg_color)
 
     except NameError, error:
         print error
 
     dest_surface.blit(surface, surface_rect)
+
+    return dest_surface
+
+
+def render_frames(frame, surface=None, size=None):
+    """
+    Dynamically render frames inside surface.
+    :type surface: pygame.Surface
+    :type frame: list or pygame.Surface
+    :type size (int)
+    """
+    dest_surface = surface
+    if surface is None:
+        if size is None:
+            return None
+        dest_surface = pygame.Surface(size)
+
+    surface_size = dest_surface.get_size()
+    try:
+        frame_size = frame[0].get_size()
+        # Coordinates:
+        top = 0
+        bot = surface_size[1] - frame_size[1]
+        left = 0
+        right = surface_size[0] - frame_size[0]
+        # Sides
+        for x in range(0, surface_size[0] - 1):
+            dest_surface.blit(frame[1], (x, top))
+            dest_surface.blit(frame[5], (x, bot))
+        for y in range(0, surface_size[1] - 1):
+            dest_surface.blit(frame[3], (left, y))
+            dest_surface.blit(frame[7], (right, y))
+        # Corners
+        dest_surface.blit(frame[0], (left, top))
+        dest_surface.blit(frame[2], (right, top))
+        dest_surface.blit(frame[4], (right, bot))
+        dest_surface.blit(frame[6], (left, bot))
+    except TypeError, err:
+        if surface_size != frame.get_size():
+            frame = pygame.transform.scale(frame, surface_size)
+        dest_surface.blit(frame, (0, 0))
 
     return dest_surface
 

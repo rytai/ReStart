@@ -141,11 +141,13 @@ class Hero(Creature):
 class NPC(Creature):
     state_of_mind = None
     action_queue = []
+    speech_id = 1
 
     def __init__(self, surface=None, inventory_instance=None):
         Creature.__init__(self, surface, inventory_instance)
         self.action_queue = []
         self.state_of_mind = StateOfMind()
+        self.speech_id = 1
 
     def get_action(self):
         # No actions in the queue. Get some.

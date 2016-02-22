@@ -28,8 +28,8 @@ def dialog_to_multiline_list(dialog):
 
 class Dialogs:
     dialogs = {0: 'Null',
+               2: 'Test',
                1: 'Hey you!|Welcome to the world of Re:Start',
-               2: 'Test'
                }
 
     def __init__(self):

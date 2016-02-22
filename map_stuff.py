@@ -26,15 +26,19 @@ class MapLoader:
 
     def load_map_named(self, map_name, resource_loader_inst, inventory_class):
 
-        map_size, map_name, string_data = self.load_map_data(map_name)
+        # Read the file to different variables. data=Lists of lines
+        map_size, map_name, map_string_data, entity_string_data = self.load_map_data(map_name)
 
-        map_layer_tile, map_layer_entities = self.resolve_map_string_data(map_size, string_data)
+        # Parse string to simple data, int ID's mainly
+        map_layer_tile = self.resolve_map_string_data(map_size, map_string_data)
+        map_layer_entities = self.resolve_map_entities_data(entity_string_data)
 
         new_map_data = self._MapData(map_size)
 
         assert isinstance(resource_loader_inst, resources.Resource_Loader)
         self.populate_map_tiles(new_map_data, map_layer_tile, resource_loader_inst)
 
+        # Create creature instances. Returns hero position.
         hero_pos = self.populate_map_entities(new_map_data, map_layer_entities, resource_loader_inst, inventory_class)
 
         self.map_data_list.append(new_map_data)
@@ -62,30 +66,48 @@ class MapLoader:
                 _map_data.texture_layer[(x,y)] = tile_texture
                 _map_data.set_passable_tile(x, y, tile_passability)
 
-    def populate_map_entities(self, _map_data, _map_layer_entities, resource_loader_inst, inventory_class):
+    def populate_map_entities(self, map_data, _map_layer_entities, resource_loader_inst, inventory_class):
+        assert isinstance(map_data, MapData)
+        hero_position = None
 
-        for _entity in _map_layer_entities:
-            if _entity[0] == 0:
-                hero_position = _entity[1]
-            elif _entity[0] == 1:
-                new_entity_surface = resource_loader_inst.load_sprite('thug')
+        for entity in _map_layer_entities:
+            id = entity[0]
+            position = entity[1]
+            speech_id = entity[2]
+
+            # Hero
+            if id == 0:
+                hero_position = position
+            # NPC
+            elif id == 1:  # Thug
+                new_surface = resource_loader_inst.load_sprite('thug')
                 new_inventory = inventory_class()
-                new_entity = NPC(new_entity_surface, inventory_instance=new_inventory)
-                new_entity.name = "Thug"
-                assert isinstance(new_entity, NPC)
-                new_entity.move(*_entity[1])
-                _map_data.character_layer[_entity[1]] = new_entity
+                new_npc = NPC(new_surface, inventory_instance=new_inventory)
+                new_npc.name = 'Thug'
+                new_npc.move(*position)
+                new_npc.speech_id = 2
+                map_data.set_character_on_map(new_npc, position)
 
-        try:
-            return hero_position
-        except NameError:
-            pass
+        return hero_position
 
-        return None
+    def resolve_map_entities_data(self, linestring_data):
+        entitities_data = []  # id, position(x,y), speech_id
+        for line in linestring_data:
+            # First value of tree int, is ID
+            id_ = int(line[0:3])
+            # Second and third values of tree int, are position.
+            pos_x = int(line[4:7])
+            pos_y = int(line[8:11])
+            position = pos_x, pos_y
+            # Fourth value of tree int, is default_speech
+            speech_id = int(line[12:15])
+
+            entitities_data.append([id_, position, speech_id])
+
+        return entitities_data
 
     def resolve_map_string_data(self, _map_size, _string_data):
         map_layer_tile = {}
-        map_layer_entities = []
 
         # string data - Rest of the map file: List of csv strings
         for line in range(_map_size[1]):
@@ -98,16 +120,6 @@ class MapLoader:
                 map_layer_tile[(tile_in_line, line)] = int(data_bit)
 
                 data_bit, string_position = self.read_bits(string_position, data_string, 1)
-                # Entity
-                if data_bit == ':':
-                    string_position += 1
-                    # Entity Id
-                    data_bit, string_position = self.read_bits(string_position, data_string, 1)
-                    new_entity = int(data_bit)
-                    new_entity_position = (tile_in_line, line)
-
-                    map_layer_entities.append((new_entity, new_entity_position))
-                    data_bit, string_position = self.read_bits(string_position, data_string, 1)
 
                 if data_bit == ',':
                     pass
@@ -116,7 +128,7 @@ class MapLoader:
                     print map_layer_tile
                     raise RuntimeError()
 
-        return map_layer_tile, map_layer_entities
+        return map_layer_tile
 
     @staticmethod
     def read_bits(_string_position, _from, _amount):
@@ -134,11 +146,18 @@ class MapLoader:
 
         map_name = f.readline()
 
-        string_data = f.readlines()
+        map_string_data = []
+        # Read the map tiles to string_data
+        for i in range(0, map_size[1]):
+            map_string_data.append(f.readline())
+
+        # Remove newline's
+        entity_string_data = [line.replace('\n', '').replace('\r', '') for line in f.readlines()]
+
 
         f.close()
 
-        return [map_size, map_name, string_data]
+        return [map_size, map_name, map_string_data, entity_string_data]
 
     def save_map(self):
         pass

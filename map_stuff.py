@@ -249,6 +249,24 @@ class MapData:
                 except KeyError:
                     return True
 
+    def get_creatures_around_tile(self, tile_t):
+        """
+
+        :rtype: list
+        """
+        results = []
+        tile_x, tile_y = tile_t
+        # Loop tiles around given coords.
+        for x in [tile_x - 1, tile_x, tile_x + 1]:
+            for y in [tile_y - 1, tile_y, tile_y + 1]:
+                # Ignore the center tile.
+                if x == tile_x and y == tile_y:
+                    continue
+                creature = self.get_character_on_position((x, y))
+                if creature:
+                    results.append((tile_x, creature))
+        return results
+
 
     def set_passable_tile(self, tile_x, tile_y, passability):
         assert isinstance(passability, bool)

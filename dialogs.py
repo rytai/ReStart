@@ -28,8 +28,8 @@ def dialog_to_multiline_list(dialog):
 
 class Dialogs:
     dialogs = {0: 'Null',
-               2: 'Test',
-               1: 'Hey you!|Welcome to the world of Re:Start',
+               1: 'Test',
+               2: 'Hey you!|Welcome to the world of Re:Start',
                }
 
     def __init__(self):
@@ -40,6 +40,10 @@ class Dialogs:
 
         :rtype: [str]
         """
-        dialog = dialog_to_multiline_list(self.dialogs[id_int])
+        try:
+            dialog = dialog_to_multiline_list(self.dialogs[id_int])
+        except KeyError:  # Got creature
+            id_int = id_int.speech_id
+            dialog = dialog_to_multiline_list(self.dialogs[id_int])
 
         return dialog

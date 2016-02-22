@@ -869,7 +869,12 @@ def main(screen):
                 elif event.subtype is 'menu':
                     main_menu.launch(screen)
 
-                elif event.subtype is 'open-dialog':
+                elif event.subtype is 'chat':
+                    creatures_ = event.data
+                    push_new_user_event('open_dialog', creatures_[0][1])
+
+
+                elif event.subtype is 'open_dialog':
                     dialog_id = event.data
                     dialog_window_inst.set_text_lines(dialogs.get_dialog(dialog_id))
                     dialog_window_inst.set_title('Hello world.')
@@ -912,7 +917,9 @@ def main(screen):
                     combat_handler.add_creature(npc)
                 # c : Chat
                 elif event.key == pygame.K_c:
-                    print 'chattychat'
+                    crs = map_data.get_creatures_around_tile(hero.positionOnMap)
+                    if crs.__len__() != 0:
+                        push_new_user_event('chat', data=crs)
                 # i : Inventory
                 elif event.key == pygame.K_i:
                     message_log.newline("-----Inventory:-----")

@@ -6,6 +6,7 @@ __author__ = 'Kodex'
 
 
 class PathFinder:
+    report_pathfinder_time = False
     class Node:
         position = (0, 0)
         parent = None
@@ -53,7 +54,7 @@ class PathFinder:
 
         self.cost_of_movement = 10
 
-    def find_path_between_points(self, start_tile, end_tile, report_time=False):
+    def find_path_between_points(self, start_tile, end_tile):
         """
 
 
@@ -99,7 +100,7 @@ class PathFinder:
             if current_node == target_node:
                 complete_path = self.retrace_path(start_node, target_node)
 
-                if report_time == True:
+                if self.report_pathfinder_time == True:
                     method_run_time = time.get_ticks() - method_init_time
                     print 'Pathfinding completed in {}ms'.format(method_run_time)
                     print complete_path

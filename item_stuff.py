@@ -22,6 +22,7 @@ class Inventory:
 class Item:
     name = ''
     surface = None
+    self.Weapon = None
 
     def __init__(self, surface=None):
         self.name = ''
@@ -29,11 +30,18 @@ class Item:
 
 
 class Weapon(Item):
+    Sword = None
     def __init__(self, name, surface=None):
         """
 
         :rtype : Weapon
         """
         Item.__init__(self, surface=surface)
+        Item.Weapon = Weapon
 
         self.name = name
+        
+class Sword(Weapon):
+    def __init__(self):
+        Weapon.__init__(self)
+        Weapon.Sword = Sword

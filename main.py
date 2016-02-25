@@ -14,6 +14,7 @@ import dice as dice
 import resources
 import devtools
 import windows
+import generators
 
 __author__ = 'Kodex'
 
@@ -447,6 +448,7 @@ class CombatHandler(CreatureActionHandler):
     def remove_creature(self, cr):
         try:
             self.creature_list.remove(cr)
+            self.reaction_order.remove(cr)
         except IndexError, err:
             print "CombatHandler, cannot pop {}, no such entry in list".format(cr)
             return None
@@ -490,7 +492,7 @@ class CombatHandler(CreatureActionHandler):
                 _message_log.newline("{target} is knocked out.".format(target=target.name))
                 self.remove_creature(target)
 
-            new_sword = Weapon(generate_item_name(), surface=sword_surface)
+            new_sword = sword_surface.generate_sword()
             map_data.set_item_on_map(new_sword, target.positionOnMap)
             map_data.remove_character_from_position(target.positionOnMap)
             try:
@@ -650,32 +652,6 @@ def random_colour():
     return random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
 
 
-def generate_item_name(_type='sword'):
-    """
-
-    :param _type: sword/
-    :rtype : str
-    """
-    sword_prefixes = ['wooden', 'broken', 'shiny', 'fine']
-    sword_middle_names = ['practise sword', 'sword', 'blade']
-    sword_affixes = ['of might', 'of killing', 'of vampirism']
-
-    new_name = ""
-
-    if _type == 'sword':
-        # 20% Chance to get prefix
-        if random.randint(0, 100) <= 20:
-            new_name += random.choice(sword_prefixes) + " "
-
-        new_name += random.choice(sword_middle_names)
-
-        if random.randint(0, 100) <= 10:
-            new_name += " " + random.choice(sword_affixes)
-    else:
-        print "Generate item name error: no type named: {}".format(_type)
-        new_name = "Null"
-
-    return new_name
 
 
 def pick_up_item(creature, map_data):
@@ -738,19 +714,24 @@ def main(screen):
     print_keypresses = False
 
     dev_hero_undying = False
-    # ----------------------------
+    # ------Init classes----------
 
     clock = pygame.time.Clock()
-    camera = Camera()
     resource_loader = resources.Resource_Loader()
+    camera = Camera()
     main_menu = MainMenu()
     map_loader = MapLoader(MapData, creatures.NPC)
-    map_editor = devtools.Map_editor(resource_loader)
-    message_log = MessageLog(default_font)
     dialogs = Dialogs()
     dialog_window_inst = windows.DialogWindow()
     combat_handler = CombatHandler()
     peaceful_action_handler = PeacefulActionHandler()
+
+    message_log = MessageLog(default_font)
+
+    map_editor = devtools.Map_editor(resource_loader)
+    item_generator = generators.ItemGenerator(resource_loader)
+
+    # ------Load variables----------
 
     hero = creatures.Hero(surface=resource_loader.load_sprite('hero'), inventory_instance=Inventory())
 
@@ -764,12 +745,17 @@ def main(screen):
 
     set_window_frames(dialog_window_inst, resource_loader, drawing)
 
-    sword_surface = resource_loader.load_sprite('sword')
-    new_weapon = Weapon(generate_item_name('sword'))
-    print hero.inventory
-    hero.inventory.add_item(new_weapon)
-    new_sword = Weapon(generate_item_name(), surface=sword_surface)
-    map_data.set_item_on_map(new_sword, (3, 4))
+    # Give hero an sword an put pne on the ground
+    hero.inventory.add_item(item_generator.generate_sword())
+    map_data.set_item_on_map(item_generator.generate_sword(), (3, 4))
+    map_data.set_item_on_map(item_generator.generate_sword(), (3, 3))
+    map_data.set_item_on_map(item_generator.generate_sword(), (3, 5))
+    map_data.set_item_on_map(item_generator.generate_sword(), (3, 6))
+    map_data.set_item_on_map(item_generator.generate_sword(), (3, 7))
+    map_data.set_item_on_map(item_generator.generate_sword(), (3, 8))
+    map_data.set_item_on_map(item_generator.generate_sword(), (3, 9))
+    map_data.set_item_on_map(item_generator.generate_sword(), (3, 10))
+    map_data.set_item_on_map(item_generator.generate_sword(), (3, 11))
 
     temp_sound = pygame.mixer.Sound('map_change.wav')
     default_font_inited = pygame.font.Font(default_font, 17)
@@ -957,10 +943,10 @@ def main(screen):
 
         # Handle combat
         if combat_handler.combat_active and not combat_handler.combat_phase_done:
-            combat_handler.handle_turn(hero, message_log, map_data, sword_surface, path_finder)
+            combat_handler.handle_turn(hero, message_log, map_data, item_generator, path_finder)
         else:
             # Handle other npc/hero actions.
-            if peaceful_action_handler.handle_turn(hero, message_log, map_data, sword_surface, path_finder):
+            if peaceful_action_handler.handle_turn(hero, message_log, map_data, item_generator, path_finder):
                 push_new_user_event('turn_order', 'turn_change')
 
         camera.set_tile_position(hero.positionOnMap)

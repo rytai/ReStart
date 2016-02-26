@@ -1,4 +1,3 @@
-
 class Inventory:
     left_hand = None
     items = []
@@ -19,29 +18,45 @@ class Inventory:
         return self.items
 
 
-class Item:
+class Item(object):
     name = ''
     surface = None
-    self.Weapon = None
+    rareness = 0
 
     def __init__(self, surface=None):
         self.name = ''
         self.surface = surface
 
 
-class Weapon(Item):
-    Sword = None
-    def __init__(self, name, surface=None):
+class Equippable(Item):
+    EQUIP_SLOT_ONE_HAND = 0
+    EQUIP_SLOT_TWO_HANDED = 1
+
+    equip_slot = EQUIP_SLOT_ONE_HAND
+    equippable = True
+
+    def __init__(self):
+        Item.__init__(self)
+        self.equip_slot = 0
+
+
+class Weapon(Equippable):
+    mod_attack = 2
+    mod_speed = 1
+
+    type = None
+
+    T_1H_SWORD = 0
+    T_2H_SWORD = 1
+
+    def __init__(self, name='', surface=None):
         """
 
         :rtype : Weapon
         """
-        Item.__init__(self, surface=surface)
-        Item.Weapon = Weapon
+        Equippable.__init__(self)
 
         self.name = name
-        
-class Sword(Weapon):
-    def __init__(self):
-        Weapon.__init__(self)
-        Weapon.Sword = Sword
+        self.surface = surface
+
+        self.type = self.T_1H_SWORD

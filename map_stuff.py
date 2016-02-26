@@ -301,7 +301,7 @@ class MapData:
             self.set_tile_dirty(position)
             try:
                 return item_or_list[-1]
-            except AttributeError:
+            except TypeError:
                 return item_or_list
         except KeyError:
             print "mapdata:takeitemfrompos: No item in here."

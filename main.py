@@ -1,6 +1,13 @@
 # coding=utf-8
 import os
 import sys
+
+try:
+    import pygame_sdl2
+
+    pygame_sdl2.import_as_pygame()
+except ImportError:
+    pass
 import pygame
 from collections import deque  # Queues
 import random
@@ -37,7 +44,7 @@ default_font = pygame.font.get_default_font()
 
 def start_menu(default_font, screen):
     basic_font = default_font
-    file_path = os.path.join('Resources', 'Fonts', 'basis33.ttf')
+    file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Resources', 'Fonts', 'basis33.ttf')
     basic_font = pygame.font.Font(file_path, 40)
 
     text_lines = [

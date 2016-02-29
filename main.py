@@ -429,7 +429,7 @@ class CombatHandler(CreatureActionHandler):
         self.creature_in_turn = None
         self.combat_phase_done = False
 
-    def create_combat(self, map_entities=None):
+    def create_combat(self, map_entities=None, hero=None):
         if map_entities:
             self.reaction_order = []  # Reset reaction. Dice will be thrown in Event
             self.creature_in_turn = None
@@ -449,7 +449,7 @@ class CombatHandler(CreatureActionHandler):
         try:
             self.creature_list.remove(cr)
             self.reaction_order.remove(cr)
-        except IndexError, err:
+        except ValueError, err:
             print "CombatHandler, cannot pop {}, no such entry in list".format(cr)
             return None
         except TypeError, err:
@@ -800,6 +800,9 @@ def main(screen):
                             else:
                                 peaceful_action_handler.add_creature(creature)
                         combat_handler.create_combat()
+                        if combat_handler.creature_list.__len__() != 0:
+                            combat_handler.add_creature(hero)
+                            hero.in_combat = True
 
                     elif event.data == 'start':
                         combat_handler.combat_active = True
@@ -910,8 +913,10 @@ def main(screen):
                 elif event.key == pygame.K_i:
                     message_log.newline("-----Inventory:-----")
                     for item in hero.inventory.get_items:
-                        assert isinstance(item, Item)
-                        message_log.newline(item.name)
+                        try:
+                            message_log.newline('{}, {}ad'.format(item.name, item.mod_attack))
+                        except AttributeError:
+                            message_log.newline('{}'.format(item.name))
                 # , : Pick item
                 elif event.key == pygame.K_COMMA:
                     pick_up_item(hero, map_data)

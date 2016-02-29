@@ -86,6 +86,15 @@ class MapLoader:
                 new_npc.name = 'Thug'
                 new_npc.move(*position)
                 new_npc.speech_id = 2
+                new_npc.in_combat = True
+                map_data.set_character_on_map(new_npc, position)
+            elif id == 2:  # Thug-NonAgressive
+                new_surface = resource_loader_inst.load_sprite('thug')
+                new_inventory = inventory_class()
+                new_npc = NPC(new_surface, inventory_instance=new_inventory)
+                new_npc.name = 'Thug'
+                new_npc.move(*position)
+                new_npc.speech_id = 2
                 map_data.set_character_on_map(new_npc, position)
 
         return hero_position

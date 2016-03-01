@@ -10,8 +10,8 @@ class MapLoader:
     _NPC = None
     map_data_list = []
     current_map = None
-
-    map_data_folder = os.path.join('Resources', 'Levels')
+    rootfolder = os.path.dirname(os.path.abspath(__file__))
+    map_data_folder = os.path.join(rootfolder, 'Resources', 'Levels')
 
     def __init__(self, _MapData, _NPC):
         """

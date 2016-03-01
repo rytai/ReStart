@@ -6,7 +6,7 @@ __author__ = 'Kodex'
 
 
 class PathFinder:
-    report_pathfinder_time = False
+    report_pathfinder_time = True
     class Node:
         position = (0, 0)
         parent = None

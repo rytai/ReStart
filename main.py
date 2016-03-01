@@ -27,13 +27,14 @@ __author__ = 'Kodex'
 
 pygame.init()
 
-size = width, height = 1280, 840
+width, height = 1280, 800
+size = width, height
 colorBlue = (0, 0, 255)
 colorRed = (255, 0, 0)
 colorWhite = (255, 255, 255)
 colorBlack = (0, 0, 0)
 
-screen_ = pygame.display.set_mode(size)
+screen_ = pygame.display.set_mode(size, pygame.HWSURFACE)
 
 # STARTGAME--------------------------
 
@@ -79,6 +80,16 @@ def start_menu(default_font, screen):
             if event.type == pygame.KEYUP:
                 if event.key == pygame.K_SPACE:
                     stuck_in_beginning = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                stuck_in_beginning = False
+
+            if event.type == pygame_sdl2.MULTIGESTURE:
+                derp = raw_input()
+                print derp
+            elif event.type == pygame_sdl2.TEXTINPUT:
+                print event
+            elif event.type == pygame_sdl2.TEXTEDITING:
+                print event
 
 
 start_menu(default_font, screen_)
@@ -254,8 +265,11 @@ class MainMenu(MenuHandler):
 class Camera:
     current_viewport = pygame.Rect((0, 0, 0, 0))
     viewport_boundaries = pygame.Rect(0, 0, 0, 0)
+    viewport_screen_position = (16, 16)
+    viewport_screen_area = pygame.Rect
+    tile_size = (64, 64)
 
-    def __init__(self, starting_position=(0, 0), viewport_size=(0, 0)):
+    def __init__(self, starting_position, viewport_size, viewport_screen_position, tile_size):
         """
 
 
@@ -264,6 +278,14 @@ class Camera:
         """
         self.current_viewport.size = viewport_size[0], viewport_size[1]
         self.current_viewport.center = starting_position
+        self.viewport_screen_position = viewport_screen_position
+        self.tile_size = tile_size
+
+        # Calculate the pixel position and size of viewport.
+        topleft_pos = viewport_screen_position
+        size_x = viewport_size[0] * tile_size[0]
+        size_y = viewport_size[1] * tile_size[1]
+        self.viewport_screen_area = pygame.Rect(topleft_pos, (size_x, size_y))
 
     def set_tile_position(self, position):
         """
@@ -290,6 +312,28 @@ class Camera:
         :rtype : pygame.Rect
         """
         return self.current_viewport
+
+    @property
+    def get_viewport_topleft_tile(self):
+        return self.current_viewport.topleft
+
+    def calculate_tilepos_from_screenpos(self, screen_position):
+
+        # Check if the position is within viewport area.
+        if self.viewport_screen_area.collidepoint(screen_position):
+            pixel_position_on_viewport_x = screen_position[0] - self.viewport_screen_position[0]
+            pixel_position_on_viewport_y = screen_position[1] - self.viewport_screen_position[1]
+
+            tile_viewport_x_position = pixel_position_on_viewport_x / self.tile_size[0]
+            tile_viewport_y_position = pixel_position_on_viewport_y / self.tile_size[1]
+
+            tile_x = tile_viewport_x_position + self.get_viewport_topleft_tile[0]
+            tile_y = tile_viewport_y_position + self.get_viewport_topleft_tile[1]
+
+            tile_position = tile_x, tile_y
+            return tile_position
+        else:
+            return False
 
 
 class CreatureActionHandler(object):
@@ -357,7 +401,7 @@ class CreatureActionHandler(object):
 
             if output is True:
                 if isinstance(self, CombatHandler):
-                    push_new_user_event('combat', 'turn_change')
+                    push_new_user_event('combat', '')
                 else:
                     push_new_user_event('turn_order', 'turn_change')
 
@@ -444,6 +488,15 @@ class CombatHandler(CreatureActionHandler):
             self.creature_list = [entity for entity in map_entities if entity.in_combat]
 
         if len(self.creature_list) != 0:
+            if len(self.creature_list) == 1:
+                if self.creature_list[0] == hero:  # Only hero is in fight.
+                    hero.in_combat = False
+                    self.remove_creature(hero)
+                else:
+                    hero.in_combat = True
+                    self.add_creature(hero)
+
+
             push_new_user_event('combat', 'start')
 
     def reset_combat(self):
@@ -624,6 +677,46 @@ class PeacefulActionHandler(CreatureActionHandler):
         return cur_creature
 
 
+class TouchResolver:
+    map_data = None
+    camera = None
+
+    def __init__(self, map_data, camera):
+        assert isinstance(map_data, MapData)
+        assert isinstance(camera, Camera)
+        self.map_data = map_data
+        self.camera = camera
+
+    def get_first_object_of_interest(self, position):
+        """Returns something in this order:
+        NPC -> Item -> Map_Position -> None"""
+        map_position = self.camera.calculate_tilepos_from_screenpos(position)
+
+        # Within viewport.
+        if map_position:
+            # Is there an NPC?
+            tile_return_value = self.map_data.tile_occupied(map_position)
+            if isinstance(tile_return_value, creatures.NPC):
+                return tile_return_value
+            else:  # Is there an Item?
+                objects_on_tile = self.map_data.get_items_on_position(map_position)
+                if objects_on_tile:
+                    try:
+                        return objects_on_tile[0], map_position
+                    except TypeError:
+                        return objects_on_tile, map_position
+                else:
+                    if self.map_data.tile_is_free(map_position):
+                        return map_position
+                    else:
+                        return None
+        else:  # Out of viewport
+            return 'Not in screen'
+
+
+
+
+
 def add_monster_to_random_position(map_data, new_monster):
     """
 
@@ -657,8 +750,6 @@ def draw_line_between_tiles(surface, from_tile, to_tile, line_width, line_color)
 
 def random_colour():
     return random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
-
-
 
 
 def pick_up_item(creature, map_data):
@@ -725,7 +816,6 @@ def main(screen):
 
     clock = pygame.time.Clock()
     resource_loader = resources.Resource_Loader()
-    camera = Camera()
     main_menu = MainMenu()
     map_loader = MapLoader(MapData, creatures.NPC)
     dialogs = Dialogs()
@@ -733,6 +823,7 @@ def main(screen):
     combat_handler = CombatHandler()
     peaceful_action_handler = PeacefulActionHandler()
 
+    camera = Camera((0, 0), (10, 10), (16, 16), (64, 64))
     message_log = MessageLog(default_font)
 
     map_editor = devtools.Map_editor(resource_loader)
@@ -764,13 +855,18 @@ def main(screen):
     map_data.set_item_on_map(item_generator.generate_sword(), (3, 10))
     map_data.set_item_on_map(item_generator.generate_sword(), (3, 11))
 
-    temp_sound = pygame.mixer.Sound('map_change.wav')
+    temp_sound = pygame.mixer.Sound(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Resources', 'Sound', 'map_change.wav'))
     default_font_inited = pygame.font.Font(default_font, 17)
 
     screen.fill(colorBlack)
 
-    combat_handler.create_combat(map_data.get_characters_on_map)
+    touch_resolver = TouchResolver(map_data, camera)
+
+
     push_new_user_event('combat', 'level_init')
+    combat_handler.create_combat(map_data.get_characters_on_map, hero)
+
 
     # MAINLOOP--------------------------
     while 1:
@@ -806,10 +902,7 @@ def main(screen):
                                 combat_handler.add_creature(creature)
                             else:
                                 peaceful_action_handler.add_creature(creature)
-                        combat_handler.create_combat()
-                        if combat_handler.creature_list.__len__() != 0:
-                            combat_handler.add_creature(hero)
-                            hero.in_combat = True
+                        combat_handler.create_combat(hero=hero)
 
                     elif event.data == 'start':
                         combat_handler.combat_active = True
@@ -870,7 +963,7 @@ def main(screen):
                     push_new_user_event('open_dialog', creatures_[0][1])
 
 
-                elif event.subtype is 'open_dialog':
+                elif event.subtype is 'open-dialog':
                     dialog_id = event.data
                     dialog_window_inst.set_text_lines(dialogs.get_dialog(dialog_id))
                     dialog_window_inst.set_title('Hello world.')
@@ -952,6 +1045,11 @@ def main(screen):
                 # TAB : Terminate program
                 elif event.key == pygame.K_TAB:
                     sys.exit()
+            elif event.type == pygame_sdl2.MOUSEBUTTONDOWN:
+                obj_ = touch_resolver.get_first_object_of_interest(event.pos)
+                print obj_
+                if obj_:
+                    push_new_user_event('combat', 'turn_change')
 
         # Handle combat
         if combat_handler.combat_active and not combat_handler.combat_phase_done:

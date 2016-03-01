@@ -1,4 +1,10 @@
 # coding=utf-8
+try:
+    import pygame_sdl2
+
+    pygame_sdl2.import_as_pygame()
+except ImportError:
+    pass
 import pygame
 import os
 
@@ -6,6 +12,7 @@ __author__ = 'Kodex'
 
 
 class Resource_Loader():
+    base_folder = os.path.dirname(os.path.abspath(__file__))
     # 64x64 character/item sprite
     sprites = {
         'hero': 'dg_classm32_swordHero.gif',
@@ -13,20 +20,20 @@ class Resource_Loader():
 
         'sword': 'dg_weapons32_sword.gif'
     }
-    sprites_folder = os.path.join('Resources', 'Sprites')
+    sprites_folder = os.path.join(base_folder, 'Resources', 'Sprites')
 
     map_tiles = {
         1: ('dg_features32_floor.gif', True),
         2: ('dg_extra132_boulderFloor.gif', False),
     }
-    map_tiles_folder = os.path.join('Resources', 'Sprites')
+    map_tiles_folder = os.path.join(base_folder, 'Resources', 'Sprites')
 
     loaded_sprites = {}
     map_tiles_loaded = False
 
     #  ID: (filename, in_pieces)
     frames = {1: ('frame_default', True), 2: ('frame_default_whole', False)}
-    frame_folder = os.path.join('Resources', 'Frames')
+    frame_folder = os.path.join(base_folder, 'Resources', 'Frames')
 
     def __init__(self):
         self.map_tiles_loaded = False

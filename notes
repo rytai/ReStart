@@ -1,0 +1,2 @@
+Multigesture event output:
+I/python  ( 2936): <Event(2050-MULTIGESTURE {'numFingers': 2, 'dDist': 0.00058507919311523438, 'dTheta': 0.00022929909755475819, 'x': 0.4609375, 'y': 0.43520718812942505, 'touchId': 2L})>

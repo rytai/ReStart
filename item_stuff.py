@@ -22,6 +22,7 @@ class Item(object):
     name = ''
     surface = None
     rareness = 0
+    position_on_map = None
 
     def __init__(self, surface=None):
         self.name = ''

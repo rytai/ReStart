@@ -173,16 +173,21 @@ class PathFinder:
 
         return neighbours
 
-    def get_distance(self, node_a, node_b):
+    @staticmethod
+    def get_distance(node_a, node_b):
         """
 
         :type node_a: PathFinder.Node
         :type node_b: PathFinder.Node
         """
 
-        x_difference = abs(node_a.position_x - node_b.position_x)
-        y_difference = abs(node_a.position_y - node_b.position_y)
-
+        try:
+            x_difference = abs(node_a.position_x - node_b.position_x)
+            y_difference = abs(node_a.position_y - node_b.position_y)
+        except AttributeError:  # Got coords instead of tile instances. Returning tuple
+            x_difference = abs(node_a[0] - node_b[0])
+            y_difference = abs(node_a[1] - node_b[1])
+            return x_difference, y_difference
         return max(x_difference, y_difference)
 
         # source: http://www.growingwiththeweb.com/2012/06/a-pathfinding-algorithm.html

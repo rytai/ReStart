@@ -9,7 +9,7 @@ class Creature(object):
     name = ""
     surface = 0
     rect = 0
-    positionOnMap = (0, 0)
+    position_on_map = (0, 0)
 
     inventory = None
 
@@ -35,7 +35,7 @@ class Creature(object):
         :rtype : None
         """
         self.rect.move_ip(x * 64, y * 64)
-        self.positionOnMap = self.positionOnMap[0] + x, self.positionOnMap[1] + y
+        self.position_on_map = self.position_on_map[0] + x, self.position_on_map[1] + y
 
     def set_position(self, x, y=0):
         try:
@@ -45,7 +45,7 @@ class Creature(object):
 
         try:
             self.rect.topleft = (x * 64, y * 64)
-            self.positionOnMap = (x, y)
+            self.position_on_map = (x, y)
         except TypeError:
             print "Invalid set position creature:{}, position:{}".format(self, (x, y))
 
@@ -134,21 +134,31 @@ class Hero(Creature):
         self.intent = self.Intent()
 
     class Intent:
+        NOT_RESOLVED = 999
         MOVE = 1
         ATTACK = 2
         WAIT = 3
+        PICK_ITEM = 4
+        WALK_TO = 5
+        CHAT = 6
         type = 0
         target = 0
-        direction = (0, 0)
+        direction = None
 
         def __init__(self):
             """
 
             :rtype : self
             """
-            self.MOVE = 1
-            self.ATTACK = 2
-            self.WAIT = 3
+            pass
+
+        @property
+        def position(self):
+            return self._position
+
+        @position.setter
+        def position(self, pos):
+            self._position = pos
 
 
 class NPC(Creature):

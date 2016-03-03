@@ -276,6 +276,17 @@ class MapData:
                     results.append((tile_x, creature))
         return results
 
+    def get_passable_tile(self, tile_tuple):
+        """
+        :type tile_tuple: tuple
+        :return: bool
+        :rtype: bool
+        """
+        try:
+            passability = self.tile_passable[(tile_tuple)]
+        except KeyError:
+            return False
+        return passability
 
     def set_passable_tile(self, tile_x, tile_y, passability):
         assert isinstance(passability, bool)
@@ -288,6 +299,7 @@ class MapData:
         :type item: Item
         """
         self.item_layer[position] = item
+        item.position_on_map = position
         self.dirty_tiles.add(position)
 
     def get_items_on_position(self, position):

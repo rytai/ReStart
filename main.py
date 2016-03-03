@@ -373,13 +373,26 @@ class CreatureActionHandler(object):
             creature = self.creature_in_turn
         # Deal with hero's turn.
         if isinstance(creature, creatures.Hero):
-            return self.hero_turn(creature, map_data, message_log, sword_surface)
+            return self.hero_turn(creature, map_data, message_log, sword_surface, path_finder)
         # Deal with npc's turn.
         elif isinstance(creature, creatures.NPC):
             return self.npc_turn(creature, hero, message_log, map_data, sword_surface, path_finder)
 
-    def hero_turn(self, hero, map_data, message_log, sword_surface):
+    def hero_turn(self, hero, map_data, message_log, sword_surface, path_finder):
         # Handle everything the hero class can do
+        """
+
+        :param hero:
+        :type hero: creatures.Hero
+        :param map_data:
+        :type map_data: map_stuff.MapData
+        :param message_log:
+        :type message_log: MessageLog
+        :param sword_surface:
+        :type sword_surface: generators.ItemGenerator
+        :param path_finder:
+        :type path_finder: PathFinder.PathFinder
+        """
         assert isinstance(hero, creatures.Hero)
         assert isinstance(map_data, MapData)
         # Get intent
@@ -388,15 +401,41 @@ class CreatureActionHandler(object):
 
             if intent_type is hero.intent.MOVE:
                 # Return the output.
-                output = self.hero_turn_move(hero, map_data, message_log, sword_surface)
+                output = self.hero_turn_move(hero, map_data, message_log, sword_surface, path_finder)
 
             elif intent_type is hero.intent.ATTACK:
-                output = self.handle_attack(hero, hero.intent.target, message_log, map_data, sword_surface)
+                distance = path_finder.get_distance(hero.position_on_map, hero.intent.target.position_on_map)
+                if distance[1] <= 1 and distance[0] <= 1:
+                    output = self.handle_attack(hero, hero.intent.target, message_log, map_data, sword_surface)
+                else:
+                    print "heropathfind"
+                    output = True
 
             elif intent_type is hero.intent.WAIT:
                 output = True
+            elif intent_type is hero.intent.WALK_TO:
+                target = hero.intent.target
+                try:  # Got tuple mayhaps?
+                    position_x, position_y = target
+                    hero.intent.type = hero.intent.WALK_TO
+                    print "Herpopathfind"
+                    output = True
+                except TypeError:  # Nope, propably an NPC. Decide interaction and reroll
+                    self.decide_hero_interaction(hero, target)
+                    output = self.hero_turn(hero, map_data, message_log, sword_surface, path_finder)
+            elif intent_type is hero.intent.PICK_ITEM:
+                # Hero standing on item.
+                if hero.intent.target.position_on_map == hero.position_on_map:
+                    self.give_item_from_ground(hero, map_data)
+                else:
+                    print "Heropathfind"
+                output = True
+            elif intent_type is hero.intent.CHAT:
+                print "Chattitychat"
+                output = True
+
             else:
-                print "There is hero intent. but it's type doesn't exist:{}".format(intent_type)
+                print "There is hero intent. but it's type isnt' handled:{}".format(intent_type)
                 output = False
 
             if output is True:
@@ -409,7 +448,20 @@ class CreatureActionHandler(object):
         else:  # There's no intent. Fall back.
             pass
 
-    def hero_turn_move(self, hero, map_data, message_log, sword_surface):
+    def decide_hero_interaction(self, hero, target):
+        """Changes hero's intent according the given target."""
+        try:
+            if target.in_combat:  # ATTACK
+                hero.intent.type = hero.intent.ATTACK
+            else:  # CHAT
+                hero.intent.type = hero.intent.CHAT
+            hero.intent.target = target
+        except AttributeError:  # Wasn't an NPC.. dafuq?
+            print "decide hero interaction, invalid target:{}".format(target)
+
+        return None
+
+    def hero_turn_move(self, hero, map_data, message_log, sword_surface, path_finder):
 
         # Try to move hero on the spot. Returns creature if there is one on the tile.
         """
@@ -419,7 +471,7 @@ class CreatureActionHandler(object):
         :rtype: bool
         """
         layer = 'char'
-        from_pos = hero.positionOnMap
+        from_pos = hero.position_on_map
         direction = hero.intent.direction
         only_check = False  # Doesn't really move there. Just checks if it's free.
         move_report = map_data.attempt_move(layer, from_pos, direction=direction, checkonly=only_check)
@@ -430,10 +482,9 @@ class CreatureActionHandler(object):
 
         # Couldn't move. There was an creature on destination tile. ATTACK
         elif isinstance(move_report, creatures.Creature):
-            hero.intent.type = hero.intent.ATTACK  # Deprecated
-            hero.intent.target = move_report
-            self.hero_turn(hero, map_data, message_log, sword_surface)
-            return True
+            self.decide_hero_interaction(hero, move_report)
+            self.hero_turn(hero, map_data, message_log, sword_surface, path_finder)
+            return False
 
         # There was a wall
         elif move_report == -1:
@@ -444,12 +495,23 @@ class CreatureActionHandler(object):
             print 'Hero turn handler: Weird attempt move output{}'.format(move_report)
             return False
 
+    @staticmethod
+    def give_item_from_ground(creature, map_data):
+        """
+
+        :param map_data: instance
+        :type creature: Creature
+        """
+        item = map_data.pop_item_from_position(creature.position_on_map)
+        if item is not None:
+            creature.inventory.add_item(item)
+
     # Rest will be declared on the subclasses.
     def npc_turn(self, *args):
         pass
 
     def handle_attack(self, *args):
-        pass
+        print "ERROR: handle attack in peaceful:{}".format(args)
 
     @property
     def creature_in_turn(self):
@@ -472,38 +534,43 @@ class CombatHandler(CreatureActionHandler):
     combat_active = False
     reaction_order = None
     combat_phase_done = False
+    message_log = None
 
-    def __init__(self):
+    def __init__(self, message_log):
         CreatureActionHandler.__init__(self)
         self.combat_active = False
         self.reaction_order = []
         self.creature_in_turn = None
         self.combat_phase_done = False
+        self.message_log = message_log
+
+    def level_init(self, creatures_on_map, hero):
+        hero.in_combat = False
+        self.creature_list = [creature for creature in creatures_on_map if creature.in_combat]
+        if self.creature_list.__len__ > 0:
+            hero.in_combat = True
+            self.creature_list.append(hero)
+
 
     def create_combat(self, map_entities=None, hero=None):
-        if map_entities:
-            self.reaction_order = []  # Reset reaction. Dice will be thrown in Event
-            self.creature_in_turn = None
+        self.combat_active = True
 
+        self.reaction_order = []  # Reset reaction. Dice will be thrown in Event
+        self.creature_in_turn = None
+
+        if map_entities:  # If list of creatures is provided as argument
             self.creature_list = [entity for entity in map_entities if entity.in_combat]
 
-        if len(self.creature_list) != 0:
-            if len(self.creature_list) == 1:
-                if self.creature_list[0] == hero:  # Only hero is in fight.
-                    hero.in_combat = False
-                    self.remove_creature(hero)
-                else:
-                    hero.in_combat = True
-                    self.add_creature(hero)
+        if self.creature_list.__len__ == 0:  # Nobody to fight
+            push_new_user_event('combat', 'end')
+            return None
+        else:  # Fight starting
+            if hero not in self.creature_list:
+                hero.in_combat = True
+                self.creature_list.append(hero)
 
-
-            push_new_user_event('combat', 'start')
-
-    def reset_combat(self):
-        self.creature_list = []
-        self.combat_active = False
-        self.reaction_order = []
-        self.creature_in_turn = None
+        self.message_log.newline('Entering combat.')
+        push_new_user_event('combat', 'start_phase')
 
     def remove_creature(self, cr):
         try:
@@ -519,8 +586,10 @@ class CombatHandler(CreatureActionHandler):
         self.check_combat_state()
 
     def check_combat_state(self):
-        if self.creature_list.__len__() == 0:
-            pass  # STOP COMBAT
+        if self.creature_list.__len__() <= 1:
+            push_new_user_event('combat', 'end')
+            for creature in self.creature_list:
+                creature.in_combat = False
 
     def next_creature_turn(self):
         try:
@@ -551,10 +620,11 @@ class CombatHandler(CreatureActionHandler):
             else:
                 _message_log.newline("{target} is knocked out.".format(target=target.name))
                 self.remove_creature(target)
+                self.check_combat_state()
 
             new_sword = sword_surface.generate_sword()
-            map_data.set_item_on_map(new_sword, target.positionOnMap)
-            map_data.remove_character_from_position(target.positionOnMap)
+            map_data.set_item_on_map(new_sword, target.position_on_map)
+            map_data.remove_character_from_position(target.position_on_map)
             try:
                 self.reaction_order.remove(target)
             except ValueError:
@@ -564,7 +634,7 @@ class CombatHandler(CreatureActionHandler):
 
     def npc_turn(self, npc, hero, message_log, map_data, sword_surface, path_finder):
         # Find where the hero is.
-        path = path_finder.find_path_between_points(npc.positionOnMap, hero.positionOnMap, old_path=npc.old_path)
+        path = path_finder.find_path_between_points(npc.position_on_map, hero.position_on_map, old_path=npc.old_path)
         npc.old_path = path
 
         # Path NOT FOUND
@@ -574,7 +644,7 @@ class CombatHandler(CreatureActionHandler):
 
             # Try to move closer to player
             layer = 'char'
-            from_pos = npc.positionOnMap
+            from_pos = npc.position_on_map
             dest_pos = path[1]  # First step on returned path.
 
             move_report = map_data.attempt_move(layer, from_pos, destination=dest_pos)
@@ -633,10 +703,27 @@ class PeacefulActionHandler(CreatureActionHandler):
         CreatureActionHandler.__init__(self)
         self.current_creature_index = 0
 
+    def level_init(self, creatures_on_map):
+        self.creature_list = [creature for creature in creatures_on_map if not creature.in_combat]
+
     def npc_turn(self, npc, hero, message_log, map_data, sword_surface, path_finder):
+
         """
-        :type npc: NPC
-        :type map_data: MapData
+
+        :param npc:
+        :type npc: creatures.NPC
+        :param hero:
+        :type hero: creatures.Hero
+        :param message_log:
+        :type message_log: MessageLog
+        :param map_data:
+        :type map_data: map_stuff.MapData
+        :param sword_surface:
+        :type sword_surface: generators.ItemGenerator
+        :param path_finder:
+        :type path_finder: PathFinder.PathFinder
+        :return:
+        :rtype:
         """
         npc_action = npc.get_action()
         if npc_action == 'wait':
@@ -645,7 +732,7 @@ class PeacefulActionHandler(CreatureActionHandler):
             choices = [(1, 0), (-1, 0), (0, -1), (0, 1)]
             random.shuffle(choices)
             for direction_of_choice in choices:
-                move_report = map_data.attempt_move('char', npc.positionOnMap, direction=direction_of_choice)
+                move_report = map_data.attempt_move('char', npc.position_on_map, direction=direction_of_choice)
                 if move_report is True:
                     npc.move(*direction_of_choice)
                     break
@@ -688,9 +775,23 @@ class TouchResolver:
         self.map_data = map_data
         self.camera = camera
 
-    def get_first_object_of_interest(self, position):
-        """Returns something in this order:
-        NPC -> Item -> Map_Position -> None"""
+    def resolve_touch(self, event=None, hero=None):
+        assert event
+        position = event.pos
+        object_ = self.get_object_on_map(position)
+        if object_:
+            if isinstance(object_, Item):
+                hero.intent.type = hero.intent.PICK_ITEM
+            else:
+                hero.intent.type = hero.intent.WALK_TO
+            hero.intent.target = object_
+
+    def get_object_on_map(self, position):
+        """
+        :type position: tuple
+        :return: NPC -> Item -> Map_Position -> None
+        :rtype: NPC or Item or None
+        """
         map_position = self.camera.calculate_tilepos_from_screenpos(position)
 
         # Within viewport.
@@ -703,19 +804,16 @@ class TouchResolver:
                 objects_on_tile = self.map_data.get_items_on_position(map_position)
                 if objects_on_tile:
                     try:
-                        return objects_on_tile[0], map_position
+                        return objects_on_tile[0]
                     except TypeError:
-                        return objects_on_tile, map_position
+                        return objects_on_tile
                 else:
-                    if self.map_data.tile_is_free(map_position):
+                    if self.map_data.get_passable_tile(map_position):
                         return map_position
                     else:
                         return None
         else:  # Out of viewport
-            return 'Not in screen'
-
-
-
+            return False
 
 
 def add_monster_to_random_position(map_data, new_monster):
@@ -752,16 +850,6 @@ def draw_line_between_tiles(surface, from_tile, to_tile, line_width, line_color)
 def random_colour():
     return random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
 
-
-def pick_up_item(creature, map_data):
-    """
-
-    :param map_data: instance
-    :type creature: Creature
-    """
-    item = map_data.pop_item_from_position(creature.positionOnMap)
-    if item is not None:
-        creature.inventory.add_item(item)
 
 
 def load_map(map_name=None, map_loader=None, resource_loader=None, hero=None):
@@ -821,11 +909,12 @@ def main(screen):
     map_loader = MapLoader(MapData, creatures.NPC)
     dialogs = Dialogs()
     dialog_window_inst = windows.DialogWindow()
-    combat_handler = CombatHandler()
     peaceful_action_handler = PeacefulActionHandler()
 
     camera = Camera((0, 0), (10, 10), (16, 16), (64, 64))
     message_log = MessageLog(default_font)
+
+    combat_handler = CombatHandler(message_log)
 
     map_editor = devtools.Map_editor(resource_loader)
     item_generator = generators.ItemGenerator(resource_loader)
@@ -836,7 +925,7 @@ def main(screen):
 
     map_data, path_finder, dirty_drawing, floor_s, world_s = load_map('default', map_loader, resource_loader, hero)
 
-    camera.set_tile_position(hero.positionOnMap)
+    camera.set_tile_position(hero.position_on_map)
     camera.set_viewport_size((10, 10))
     camera.set_viewport_boundaries((0, 0), map_data.mapBoundaries)
 
@@ -864,10 +953,9 @@ def main(screen):
 
     touch_resolver = TouchResolver(map_data, camera)
 
-
     push_new_user_event('combat', 'level_init')
-    combat_handler.create_combat(map_data.get_characters_on_map, hero)
-
+    push_new_user_event('combat', 'start')
+    # combat_handler.create_combat(map_data.get_characters_on_map, hero)
 
     # MAINLOOP--------------------------
     while 1:
@@ -881,13 +969,18 @@ def main(screen):
             if event.type == pygame.QUIT:
                 sys.exit()
 
-            if event.type == pygame.USEREVENT:
+            # Clicked on the screen. Better check it out.
+            elif event.type == pygame_sdl2.MOUSEBUTTONDOWN:
+                touch_resolver.resolve_touch(event=event, hero=hero)
+
+            elif event.type == pygame.USEREVENT:
                 if event.subtype is 'map_change':
                     try:
                         if event.data[0] == '@':
                             map_load_return = load_map('map_arena.map', map_loader, resource_loader, hero)
                             map_data, path_finder, dirty_drawing, floor_s, world_s = map_load_return
                             push_new_user_event('combat', 'level_init')
+                            push_new_user_event('combat', 'start')
 
                             camera.set_viewport_boundaries((0, 0), map_data.mapBoundaries)
 
@@ -897,19 +990,11 @@ def main(screen):
 
                 elif event.subtype is 'combat':
                     if event.data == 'level_init':
-                        combat_handler.reset_combat()
-                        for creature in map_data.get_characters_on_map:
-                            if creature.in_combat:
-                                combat_handler.add_creature(creature)
-                            else:
-                                peaceful_action_handler.add_creature(creature)
-                        combat_handler.create_combat(hero=hero)
+                        combat_handler.level_init(map_data.get_characters_on_map, hero)
+                        peaceful_action_handler.level_init(map_data.get_characters_on_map)
 
                     elif event.data == 'start':
-                        combat_handler.combat_active = True
-                        combat_handler.reaction_order = dice.roll_reactions(combat_handler.creature_list)
-                        message_log.newline('Entering combat.')
-                        push_new_user_event('combat', 'start_phase')
+                        combat_handler.create_combat(hero=hero)
 
                     elif event.data == 'start_phase':
                         combat_handler.combat_phase_done = False
@@ -934,12 +1019,15 @@ def main(screen):
                             push_new_user_event('combat', 'end_of_phase')
 
                     elif event.data == "end_of_phase":
-                        message_log.newline('End of combat phase.')
+                        message_log.newline('-------------------------------')
                         combat_handler.combat_phase_done = True
                         push_new_user_event('turn_order', 'start_phase')
 
                     elif event.data == "end":
                         combat_handler.combat_active = False
+                        peaceful_action_handler.creature_list = map_data.get_characters_on_map
+                        push_new_user_event('turn_order', 'start_phase')
+
 
                     else:
                         print "Invalid combat event data:{}".format(event.data)
@@ -1007,7 +1095,7 @@ def main(screen):
                     combat_handler.add_creature(npc)
                 # c : Chat
                 elif event.key == pygame.K_c:
-                    crs = map_data.get_creatures_around_tile(hero.positionOnMap)
+                    crs = map_data.get_creatures_around_tile(hero.position_on_map)
                     if crs.__len__() != 0:
                         push_new_user_event('chat', data=crs)
                 # i : Inventory
@@ -1020,7 +1108,7 @@ def main(screen):
                             message_log.newline('{}'.format(item.name))
                 # , : Pick item
                 elif event.key == pygame.K_COMMA:
-                    pick_up_item(hero, map_data)
+                    peaceful_action_handler.give_item_from_ground(hero, map_data)
                 # > : Change map
                 elif event.key == 60 and pygame.key.get_mods() & pygame.KMOD_SHIFT:
                     push_new_user_event('map_change', data='@')
@@ -1046,11 +1134,6 @@ def main(screen):
                 # TAB : Terminate program
                 elif event.key == pygame.K_TAB:
                     sys.exit()
-            elif event.type == pygame_sdl2.MOUSEBUTTONDOWN:
-                obj_ = touch_resolver.get_first_object_of_interest(event.pos)
-                print obj_
-                if obj_:
-                    push_new_user_event('combat', 'turn_change')
 
         # Handle combat
         if combat_handler.combat_active and not combat_handler.combat_phase_done:
@@ -1060,7 +1143,7 @@ def main(screen):
             if peaceful_action_handler.handle_turn(hero, message_log, map_data, item_generator, path_finder):
                 push_new_user_event('turn_order', 'turn_change')
 
-        camera.set_tile_position(hero.positionOnMap)
+        camera.set_tile_position(hero.position_on_map)
 
         dirty_drawing.draw(screen, world_s, camera, floor_s, map_data)
 

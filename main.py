@@ -401,7 +401,7 @@ class CreatureActionHandler(object):
 
             if output is True:
                 if isinstance(self, CombatHandler):
-                    push_new_user_event('combat', '')
+                    push_new_user_event('combat', 'turn_change')
                 else:
                     push_new_user_event('turn_order', 'turn_change')
 

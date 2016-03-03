@@ -96,6 +96,8 @@ class MapLoader:
                 new_npc.move(*position)
                 new_npc.speech_id = 2
                 map_data.set_character_on_map(new_npc, position)
+            else:
+                print 'MapLoader cannot populate:{}'.format(entity)
 
         return hero_position
 

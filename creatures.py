@@ -141,9 +141,10 @@ class Hero(Creature):
         PICK_ITEM = 4
         WALK_TO = 5
         CHAT = 6
-        type = 0
+        i_type = 0
         target = 0
         direction = None
+        do_not_reset = False
 
         def __init__(self):
             """
@@ -151,6 +152,15 @@ class Hero(Creature):
             :rtype : self
             """
             pass
+
+        @property
+        def i_type(self):
+            return self._i_type
+
+        @i_type.setter
+        def i_type(self, _type):
+            self.do_not_reset = False
+            self._i_type = _type
 
         @property
         def position(self):

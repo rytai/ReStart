@@ -377,6 +377,8 @@ class CreatureActionHandler(object):
         # Deal with npc's turn.
         elif isinstance(creature, creatures.NPC):
             return self.npc_turn(creature, hero, message_log, map_data, sword_surface, path_finder)
+        else:
+            pass
 
     def hero_turn(self, hero, map_data, message_log, sword_surface, path_finder):
         # Handle everything the hero class can do
@@ -396,7 +398,7 @@ class CreatureActionHandler(object):
         assert isinstance(hero, creatures.Hero)
         assert isinstance(map_data, MapData)
         # Get intent
-        intent_type = hero.intent.type
+        intent_type = hero.intent.i_type
         if intent_type:  # There is an intent, continue
 
             if intent_type is hero.intent.MOVE:
@@ -407,29 +409,46 @@ class CreatureActionHandler(object):
                 distance = path_finder.get_distance(hero.position_on_map, hero.intent.target.position_on_map)
                 if distance[1] <= 1 and distance[0] <= 1:
                     output = self.handle_attack(hero, hero.intent.target, message_log, map_data, sword_surface)
+                    hero.intent.do_not_reset = False
                 else:
-                    print "heropathfind"
+                    self.hero_turn_move(hero, map_data, message_log, sword_surface, path_finder, find_path=True)
                     output = True
 
             elif intent_type is hero.intent.WAIT:
                 output = True
+
             elif intent_type is hero.intent.WALK_TO:
                 target = hero.intent.target
                 try:  # Got tuple mayhaps?
                     position_x, position_y = target
-                    hero.intent.type = hero.intent.WALK_TO
-                    print "Herpopathfind"
-                    output = True
+                    if target == hero.position_on_map:  # Standing on target.
+                        hero.intent.i_type = hero.intent.PICK_ITEM
+                        hero.intent.do_not_reset = False
+                        output = self.hero_turn(hero, map_data, message_log, sword_surface, path_finder)
+
+                    else:  # Continue to target.
+                        hero.intent.i_type = hero.intent.WALK_TO
+                        if self.hero_turn_move(hero, map_data, message_log, sword_surface, path_finder, find_path=True):
+                            hero.intent.do_not_reset = False
+                        output = True
                 except TypeError:  # Nope, propably an NPC. Decide interaction and reroll
                     self.decide_hero_interaction(hero, target)
                     output = self.hero_turn(hero, map_data, message_log, sword_surface, path_finder)
+
+
             elif intent_type is hero.intent.PICK_ITEM:
                 # Hero standing on item.
-                if hero.intent.target.position_on_map == hero.position_on_map:
+                try:
+                    target_position = hero.intent.target.position_on_map
+                except AttributeError:
+                    target_position = hero.intent.target
+                if target_position == hero.position_on_map:
                     self.give_item_from_ground(hero, map_data)
+                    hero.intent.do_not_reset = False
                 else:
-                    print "Heropathfind"
+                    self.hero_turn_move(hero, map_data, message_log, sword_surface, path_finder, find_path=True)
                 output = True
+
             elif intent_type is hero.intent.CHAT:
                 print "Chattitychat"
                 output = True
@@ -452,32 +471,48 @@ class CreatureActionHandler(object):
         """Changes hero's intent according the given target."""
         try:
             if target.in_combat:  # ATTACK
-                hero.intent.type = hero.intent.ATTACK
+                hero.intent.i_type = hero.intent.ATTACK
             else:  # CHAT
-                hero.intent.type = hero.intent.CHAT
+                hero.intent.i_type = hero.intent.CHAT
             hero.intent.target = target
         except AttributeError:  # Wasn't an NPC.. dafuq?
             print "decide hero interaction, invalid target:{}".format(target)
 
         return None
 
-    def hero_turn_move(self, hero, map_data, message_log, sword_surface, path_finder):
-
-        # Try to move hero on the spot. Returns creature if there is one on the tile.
+    def hero_turn_move(self, hero, map_data, message_log, sword_surface, path_finder, find_path=False):
         """
+        Try to move hero on the spot. Returns creature if there is one on the tile.
         :param hero: creatures.Hero
         :param map_data: MapData
         :param message_log: MessageLog
         :rtype: bool
         """
         layer = 'char'
-        from_pos = hero.position_on_map
-        direction = hero.intent.direction
-        only_check = False  # Doesn't really move there. Just checks if it's free.
-        move_report = map_data.attempt_move(layer, from_pos, direction=direction, checkonly=only_check)
+
+        # PATHFINDING
+        if find_path:
+            try:
+                target = hero.intent.target.position_on_map
+            except AttributeError:
+                target = hero.intent.target
+            path = path_finder.find_path_between_points(hero.position_on_map, target)
+            hero.old_path = path
+
+            next_step = path[1]
+
+            move_report = map_data.attempt_move(layer, hero.position_on_map, destination=next_step, checkonly=False)
+        else:
+            from_pos = hero.position_on_map
+            direction = hero.intent.direction
+            only_check = False  # Doesn't really move there. Just checks if it's free.
+            move_report = map_data.attempt_move(layer, from_pos, direction=direction, checkonly=only_check)
 
         if move_report is True:  # Move successful
-            hero.move(*hero.intent.direction)
+            if find_path:
+                hero.set_position(*next_step)
+            else:
+                hero.move(*hero.intent.direction)
             return True
 
         # Couldn't move. There was an creature on destination tile. ATTACK
@@ -488,7 +523,7 @@ class CreatureActionHandler(object):
 
         # There was a wall
         elif move_report == -1:
-            hero.intent.type = hero.intent.WAIT
+            hero.intent.i_type = hero.intent.WAIT
             message_log.newline('Ouch! You bumped to a wall.')
             return True
         else:
@@ -550,7 +585,6 @@ class CombatHandler(CreatureActionHandler):
         if self.creature_list.__len__ > 0:
             hero.in_combat = True
             self.creature_list.append(hero)
-
 
     def create_combat(self, map_entities=None, hero=None):
         self.combat_active = True
@@ -781,9 +815,10 @@ class TouchResolver:
         object_ = self.get_object_on_map(position)
         if object_:
             if isinstance(object_, Item):
-                hero.intent.type = hero.intent.PICK_ITEM
+                hero.intent.i_type = hero.intent.PICK_ITEM
             else:
-                hero.intent.type = hero.intent.WALK_TO
+                hero.intent.i_type = hero.intent.WALK_TO
+            hero.intent.do_not_reset = True
             hero.intent.target = object_
 
     def get_object_on_map(self, position):
@@ -851,7 +886,6 @@ def random_colour():
     return random.randint(0, 255), random.randint(0, 255), random.randint(0, 255)
 
 
-
 def load_map(map_name=None, map_loader=None, resource_loader=None, hero=None):
     assert isinstance(map_loader, MapLoader)
     assert isinstance(resource_loader, resources.Resource_Loader)
@@ -895,7 +929,12 @@ def set_window_frames(dialog_window_inst, resource_loader, drawing, id=None):
         dialog_window_inst.set_frame_surface(frame_render)
 
 
+class CustomEvents:
+    E_MAP_CHANGE = pygame.USEREVENT + 1
+
+
 def main(screen):
+    ev = CustomEvents
     # -----------Debug------------
 
     print_keypresses = False
@@ -935,15 +974,9 @@ def main(screen):
 
     # Give hero an sword an put pne on the ground
     hero.inventory.add_item(item_generator.generate_sword())
-    map_data.set_item_on_map(item_generator.generate_sword(), (3, 4))
-    map_data.set_item_on_map(item_generator.generate_sword(), (3, 3))
-    map_data.set_item_on_map(item_generator.generate_sword(), (3, 5))
-    map_data.set_item_on_map(item_generator.generate_sword(), (3, 6))
-    map_data.set_item_on_map(item_generator.generate_sword(), (3, 7))
-    map_data.set_item_on_map(item_generator.generate_sword(), (3, 8))
-    map_data.set_item_on_map(item_generator.generate_sword(), (3, 9))
-    map_data.set_item_on_map(item_generator.generate_sword(), (3, 10))
-    map_data.set_item_on_map(item_generator.generate_sword(), (3, 11))
+    map_data.set_item_on_map(item_generator.generate_sword(), (1, 6))
+    map_data.set_item_on_map(item_generator.generate_sword(), (1, 4))
+    map_data.set_item_on_map(item_generator.generate_sword(), (1, 3))
 
     temp_sound = pygame.mixer.Sound(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), 'Resources', 'Sound', 'map_change.wav'))
@@ -960,7 +993,8 @@ def main(screen):
     # MAINLOOP--------------------------
     while 1:
         clock.tick(40)
-        hero.intent.type = 0
+        if not hero.intent.do_not_reset:
+            hero.intent.i_type = 0
 
         if dev_hero_undying:
             hero.sheet.fatigue = 0
@@ -969,26 +1003,100 @@ def main(screen):
             if event.type == pygame.QUIT:
                 sys.exit()
 
+            elif event.type == pygame.KEYUP:
+                if print_keypresses:
+                    print event.key
+                if event.key == pygame.K_SPACE:
+                    hero.intent.i_type = hero.intent.WAIT
+                elif event.key == pygame.K_UP or event.key == pygame.K_KP8:
+                    hero.intent.i_type = hero.intent.MOVE
+                    hero.intent.direction = (0, -1)
+                elif event.key == pygame.K_DOWN or event.key == pygame.K_KP2:
+                    hero.intent.i_type = hero.intent.MOVE
+                    hero.intent.direction = (0, 1)
+                elif event.key == pygame.K_LEFT or event.key == pygame.K_KP4:
+                    hero.intent.i_type = hero.intent.MOVE
+                    hero.intent.direction = (-1, 0)
+                elif event.key == pygame.K_RIGHT or event.key == pygame.K_KP6:
+                    hero.intent.i_type = hero.intent.MOVE
+                    hero.intent.direction = (1, 0)
+                elif event.key == pygame.K_KP7:
+                    hero.intent.i_type = hero.intent.MOVE
+                    hero.intent.direction = (-1, -1)
+                elif event.key == pygame.K_KP9:
+                    hero.intent.i_type = hero.intent.MOVE
+                    hero.intent.direction = (1, -1)
+                elif event.key == pygame.K_KP3:
+                    hero.intent.i_type = hero.intent.MOVE
+                    hero.intent.direction = (1, 1)
+                elif event.key == pygame.K_KP1:
+                    hero.intent.i_type = hero.intent.MOVE
+                    hero.intent.direction = (-1, 1)
+
+                # + : Add enemy
+                elif event.key == pygame.K_KP_PLUS:
+                    new_creature = creatures.NPC(resource_loader.load_sprite('thug'))
+                    npc = add_monster_to_random_position(map_data, new_creature)
+                    combat_handler.add_creature(npc)
+                # c : Chat
+                elif event.key == pygame.K_c:
+                    crs = map_data.get_creatures_around_tile(hero.position_on_map)
+                    if crs.__len__() != 0:
+                        push_new_user_event('chat', data=crs)
+                # i : Inventory
+                elif event.key == pygame.K_i:
+                    message_log.newline("-----Inventory:-----")
+                    for item in hero.inventory.get_items:
+                        try:
+                            message_log.newline('{}, {}ad'.format(item.name, item.mod_attack))
+                        except AttributeError:
+                            message_log.newline('{}'.format(item.name))
+                # , : Pick item
+                elif event.key == pygame.K_COMMA:
+                    peaceful_action_handler.give_item_from_ground(hero, map_data)
+                # > : Change map
+                elif event.key == 60 and pygame.key.get_mods() & pygame.KMOD_SHIFT:
+                    new_event = pygame.event.Event(ev.E_MAP_CHANGE, map_name='@')
+                    pygame.event.post(new_event)
+                # F1 : GodMode
+                elif event.key == pygame.K_F1:
+                    dev_hero_undying = not dev_hero_undying
+                    message_log.newline('God mode: {}'.format(dev_hero_undying))
+                # F2: Menu
+                elif event.key == pygame.K_F2:
+                    push_new_user_event('menu')
+                # F3: MapEditor
+                elif event.key == pygame.K_F3:
+                    map_editor.launch(map_data, screen)
+                    screen.fill(colorBlack)
+                    dirty_drawing.issue_world_surface_redraw()
+                    message_log.set_is_dirty(True)
+                # F4: Open chat-window
+                elif event.key == pygame.K_F4:
+                    push_new_user_event('open-dialog', data=1)
+                # Home: Mouse position to caption.
+                elif event.key == pygame.K_HOME:
+                    devtools.mouse_position_to_caption()
+                # TAB : Terminate program
+                elif event.key == pygame.K_TAB:
+                    sys.exit()
+
             # Clicked on the screen. Better check it out.
             elif event.type == pygame_sdl2.MOUSEBUTTONDOWN:
                 touch_resolver.resolve_touch(event=event, hero=hero)
 
+            elif event.type == ev.E_MAP_CHANGE:
+                if event.map_name == '@':
+                    map_load_return = load_map('map_arena.map', map_loader, resource_loader, hero)
+                    map_data, path_finder, dirty_drawing, floor_s, world_s = map_load_return
+                    push_new_user_event('combat', 'level_init')
+                    push_new_user_event('combat', 'start')
+
+                    camera.set_viewport_boundaries((0, 0), map_data.mapBoundaries)
+
+                    temp_sound.play()
             elif event.type == pygame.USEREVENT:
-                if event.subtype is 'map_change':
-                    try:
-                        if event.data[0] == '@':
-                            map_load_return = load_map('map_arena.map', map_loader, resource_loader, hero)
-                            map_data, path_finder, dirty_drawing, floor_s, world_s = map_load_return
-                            push_new_user_event('combat', 'level_init')
-                            push_new_user_event('combat', 'start')
-
-                            camera.set_viewport_boundaries((0, 0), map_data.mapBoundaries)
-
-                            temp_sound.play()
-                    except IndexError:
-                        print "Invalid map_change data: {}".format(event.data)
-
-                elif event.subtype is 'combat':
+                if event.subtype is 'combat':
                     if event.data == 'level_init':
                         combat_handler.level_init(map_data.get_characters_on_map, hero)
                         peaceful_action_handler.level_init(map_data.get_characters_on_map)
@@ -1057,83 +1165,6 @@ def main(screen):
                     dialog_window_inst.set_text_lines(dialogs.get_dialog(dialog_id))
                     dialog_window_inst.set_title('Hello world.')
                     drawing.render_window(screen, dialog_window_inst, default_font_inited)
-
-            if event.type == pygame.KEYUP:
-                if print_keypresses:
-                    print event.key
-                if event.key == pygame.K_SPACE:
-                    hero.intent.type = hero.intent.WAIT
-                elif event.key == pygame.K_UP or event.key == pygame.K_KP8:
-                    hero.intent.type = hero.intent.MOVE
-                    hero.intent.direction = (0, -1)
-                elif event.key == pygame.K_DOWN or event.key == pygame.K_KP2:
-                    hero.intent.type = hero.intent.MOVE
-                    hero.intent.direction = (0, 1)
-                elif event.key == pygame.K_LEFT or event.key == pygame.K_KP4:
-                    hero.intent.type = hero.intent.MOVE
-                    hero.intent.direction = (-1, 0)
-                elif event.key == pygame.K_RIGHT or event.key == pygame.K_KP6:
-                    hero.intent.type = hero.intent.MOVE
-                    hero.intent.direction = (1, 0)
-                elif event.key == pygame.K_KP7:
-                    hero.intent.type = hero.intent.MOVE
-                    hero.intent.direction = (-1, -1)
-                elif event.key == pygame.K_KP9:
-                    hero.intent.type = hero.intent.MOVE
-                    hero.intent.direction = (1, -1)
-                elif event.key == pygame.K_KP3:
-                    hero.intent.type = hero.intent.MOVE
-                    hero.intent.direction = (1, 1)
-                elif event.key == pygame.K_KP1:
-                    hero.intent.type = hero.intent.MOVE
-                    hero.intent.direction = (-1, 1)
-
-                # + : Add enemy
-                elif event.key == pygame.K_KP_PLUS:
-                    new_creature = creatures.NPC(resource_loader.load_sprite('thug'))
-                    npc = add_monster_to_random_position(map_data, new_creature)
-                    combat_handler.add_creature(npc)
-                # c : Chat
-                elif event.key == pygame.K_c:
-                    crs = map_data.get_creatures_around_tile(hero.position_on_map)
-                    if crs.__len__() != 0:
-                        push_new_user_event('chat', data=crs)
-                # i : Inventory
-                elif event.key == pygame.K_i:
-                    message_log.newline("-----Inventory:-----")
-                    for item in hero.inventory.get_items:
-                        try:
-                            message_log.newline('{}, {}ad'.format(item.name, item.mod_attack))
-                        except AttributeError:
-                            message_log.newline('{}'.format(item.name))
-                # , : Pick item
-                elif event.key == pygame.K_COMMA:
-                    peaceful_action_handler.give_item_from_ground(hero, map_data)
-                # > : Change map
-                elif event.key == 60 and pygame.key.get_mods() & pygame.KMOD_SHIFT:
-                    push_new_user_event('map_change', data='@')
-                # F1 : GodMode
-                elif event.key == pygame.K_F1:
-                    dev_hero_undying = not dev_hero_undying
-                    message_log.newline('God mode: {}'.format(dev_hero_undying))
-                # F2: Menu
-                elif event.key == pygame.K_F2:
-                    push_new_user_event('menu')
-                # F3: MapEditor
-                elif event.key == pygame.K_F3:
-                    map_editor.launch(map_data, screen)
-                    screen.fill(colorBlack)
-                    dirty_drawing.issue_world_surface_redraw()
-                    message_log.set_is_dirty(True)
-                # F4: Open chat-window
-                elif event.key == pygame.K_F4:
-                    push_new_user_event('open-dialog', data=1)
-                # Home: Mouse position to caption.
-                elif event.key == pygame.K_HOME:
-                    devtools.mouse_position_to_caption()
-                # TAB : Terminate program
-                elif event.key == pygame.K_TAB:
-                    sys.exit()
 
         # Handle combat
         if combat_handler.combat_active and not combat_handler.combat_phase_done:

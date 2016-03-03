@@ -7,6 +7,7 @@ __author__ = 'Kodex'
 
 class PathFinder:
     report_pathfinder_time = True
+
     class Node:
         position = (0, 0)
         parent = None
@@ -54,18 +55,26 @@ class PathFinder:
 
         self.cost_of_movement = 10
 
-    def find_path_between_points(self, start_tile, end_tile):
+    def find_path_between_points(self, start_tile, end_tile, old_path=[]):
         """
 
 
         :param point_a: Tuple(int, int)
         :param point_b: Tuple(int, int)
+        :param old_path: list
         :rtype : List(Tuple)
         :rtype time_module: pygame.time
         """
 
         assert isinstance(start_tile, tuple)
         assert isinstance(end_tile, tuple)
+
+        # Start and end tiles are on the old path. No need to find path.
+        old_path = self.test_if_on_same_path(start_tile, end_tile, old_path)
+        if old_path:
+            if self.report_pathfinder_time:
+                print "No need for pathfinding p:{}".format(old_path)
+            return old_path
 
         method_init_time = time.get_ticks()
 
@@ -92,9 +101,8 @@ class PathFinder:
 
             current_node = open_nodes.pop_smallest()
 
-
             # Remove the current node from open set and add it to closed set.
-            #open_nodes.remove(current_node)
+            # open_nodes.remove(current_node)
             closed_nodes.add(current_node)
             # Found the end tile.
             if current_node == target_node:
@@ -115,7 +123,6 @@ class PathFinder:
                 new_movement_cost_to_neighbor = current_node.g_cost + 10
                 # Try to find a lower cost for neighbor, or calculate if it doesn't have one.
                 if new_movement_cost_to_neighbor < neighbour_node.g_cost or neighbour_node not in open_nodes.keys():
-
                     # Calculate the costs for the neighbor
                     neighbour_node.g_cost = new_movement_cost_to_neighbor
                     neighbour_node.h_cost = self.get_distance(neighbour_node, target_node)
@@ -133,7 +140,7 @@ class PathFinder:
         current_node = end_node
 
         path = [current_node.position]
-        
+
         while current_node != start_node:
             path.append(current_node.parent.position)
             current_node = current_node.parent
@@ -176,6 +183,37 @@ class PathFinder:
         x_difference = abs(node_a.position_x - node_b.position_x)
         y_difference = abs(node_a.position_y - node_b.position_y)
 
-        return max (x_difference, y_difference)
+        return max(x_difference, y_difference)
 
         # source: http://www.growingwiththeweb.com/2012/06/a-pathfinding-algorithm.html
+
+    def test_if_on_same_path(self, start_pos, end_pos, path):
+        """If the destination and start position is within the old path,
+         return it instead of wasting cpu
+         :rtype: list or None
+         :param start_pos: tuple
+         :param end_pos: tuple
+         :param path: list"""
+
+        if start_pos in path and end_pos in path:
+            # Starting point is exactly the same.
+            if path[0] == start_pos:
+                pass  # Nothing to do here
+            elif path[1] == start_pos:
+                path = path[1:]  # Take the first node out (Last time it was starting point, now it's behind)
+
+            try:
+                if path[-1] == end_pos:
+                    pass  # Destination hasn't moved.
+                if path[-2] == end_pos:
+                    path = path[:-1]
+                if path[-3] == end_pos:
+                    path = path[:-2]
+                if path[-5] == end_pos:
+                    path = path[:-2]
+            except IndexError:
+                pass
+
+            return path
+        else:
+            return None

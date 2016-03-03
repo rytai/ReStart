@@ -5,7 +5,7 @@ __author__ = 'Kodex'
 import random
 
 
-class Creature:
+class Creature(object):
     name = ""
     surface = 0
     rect = 0
@@ -15,6 +15,9 @@ class Creature:
 
     in_combat = False
 
+    # Here is saved last pathfinding path.
+    old_path = []
+
     def __init__(self, surface=None, inventory_instance=None):
         self.name = ""
         self.surface = surface
@@ -23,6 +26,8 @@ class Creature:
         self.sheet = self.Sheet()
 
         self.inventory = inventory_instance
+
+        self.old_path = []
 
     def move(self, x, y):
         """
@@ -85,6 +90,14 @@ class Creature:
             attack_report.append("missed")
 
         return attack_report
+
+    @property
+    def old_path(self):
+        return self._old_path
+
+    @old_path.setter
+    def old_path(self, path):
+        self._old_path = path
 
     class Sheet:
         fatigue = 0

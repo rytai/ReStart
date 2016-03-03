@@ -564,7 +564,8 @@ class CombatHandler(CreatureActionHandler):
 
     def npc_turn(self, npc, hero, message_log, map_data, sword_surface, path_finder):
         # Find where the hero is.
-        path = path_finder.find_path_between_points(npc.positionOnMap, hero.positionOnMap)
+        path = path_finder.find_path_between_points(npc.positionOnMap, hero.positionOnMap, old_path=npc.old_path)
+        npc.old_path = path
 
         # Path NOT FOUND
         if path == 'path_not_found' or not path:
